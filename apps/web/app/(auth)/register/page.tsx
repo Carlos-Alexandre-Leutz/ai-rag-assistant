@@ -33,8 +33,8 @@ export default function RegisterPage() {
   };
 
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center p-24">
-      <div className="w-full max-w-md p-8 space-y-6 bg-black rounded shadow-md">
+    <main className="flex min-h-screen flex-col items-center justify-center p-4 sm:p-24 bg-zinc-950 text-white">
+      <div className="w-full max-w-md p-6 sm:p-8 space-y-6 bg-black rounded-lg border border-zinc-800 shadow-md">
         <h1 className="text-2xl font-bold text-center">Create Account</h1>
 
         <form onSubmit={handleRegister} className="space-y-4">
@@ -68,14 +68,17 @@ export default function RegisterPage() {
           />
           <button
             type="submit"
-            className="w-full p-2 bg-green-600 text-white rounded hover:bg-green-700 transition-colors"
+            className="w-full p-2.5 bg-green-600 text-white font-medium rounded hover:bg-green-700 transition-colors"
           >
             Sign up
           </button>
         </form>
 
-        <p className="text-center text-sm mt-4">
-          Do you already have an account? <a href="/login" className="text-blue-500">Log in</a>
+        <p className="text-center text-sm text-gray-400 mt-4">
+          Do you already have an account?{' '}
+          <a href="/login" className="text-blue-500 hover:underline">
+            Log in
+          </a>
         </p>
       </div>
     </main>

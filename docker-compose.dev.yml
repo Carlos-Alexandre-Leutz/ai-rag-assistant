@@ -18,7 +18,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.dev
-    command: sh -c "pnpm --filter api-tasks exec prisma generate --schema=prisma/schema.prisma && pnpm --filter api-tasks dev"
+    command: sh -c "pnpm --filter api-tasks exec prisma generate --schema=prisma/schema.prisma && pnpm --filter api-tasks exec prisma db push && pnpm --filter api-tasks dev"
     volumes:
       - .:/app
       - /app/node_modules
@@ -27,8 +27,10 @@ services:
       - "3002:3002"
     depends_on:
       - db
+    env_file:
+      - ./apps/api-tasks/.env
     environment:
-      - DATABASE_URL=postgresql://alexandre:mysecretpassword@db:5432/saas_business_manager?schema=public
+      - WATCHPACK_POLLING=true
 
   bff:
     build:
@@ -44,7 +46,9 @@ services:
     depends_on:
       - api-tasks
     env_file:
-      - .env
+      - ./apps/bff/.env
+    environment:
+      - WATCHPACK_POLLING=true
 
   frontend:
     build:
@@ -58,8 +62,11 @@ services:
       - /app/apps/web/.next
     ports:
       - "3000:3000"
+    env_file:
+      - ./apps/web/.env
     environment:
-      - NEXT_PUBLIC_BFF_URL=http://localhost:3001
+      - WATCHPACK_POLLING=true
+      - CHOKIDAR_USEPOLLING=true
 
 volumes:
   postgres_data:
