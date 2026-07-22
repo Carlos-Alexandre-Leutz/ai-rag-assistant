@@ -25,8 +25,8 @@ export default function LoginPage() {
   };
 
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center p-24">
-      <div className="w-full max-w-md p-8 space-y-6 bg-black rounded shadow-md">
+    <main className="flex min-h-screen flex-col items-center justify-center p-4 sm:p-24 bg-zinc-950 text-white">
+      <div className="w-full max-w-md p-6 sm:p-8 space-y-6 bg-black rounded-lg border border-zinc-800 shadow-md">
         <h1 className="text-2xl font-bold text-center">Login</h1>
 
         <form onSubmit={handleLogin} className="space-y-4">
@@ -46,15 +46,15 @@ export default function LoginPage() {
           />
           <button
             type="submit"
-            className="w-full p-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+            className="w-full p-2.5 bg-blue-600 text-white font-medium rounded hover:bg-blue-700 transition-colors"
           >
             Sign In
           </button>
         </form>
 
-        <div className="flex justify-between text-sm text-blue-500 mt-4">
-          <a href="/register">Create Account</a>
-          <a href="/forgot-password">Forgot Password</a>
+        <div className="flex flex-col sm:flex-row justify-between items-center gap-2 text-sm text-blue-500 mt-4">
+          <a href="/register" className="hover:underline">Create Account</a>
+          <a href="/forgot-password" className="hover:underline">Forgot Password</a>
         </div>
       </div>
     </main>
