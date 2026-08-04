@@ -38,6 +38,7 @@ services:
     environment:
       - TASKS_API_URL=http://api-tasks:3002
       - AI_SERVICE_URL=http://ai-service:8000
+      - ALLOWED_ORIGINS=http://localhost:3000
 
   frontend:
     build:

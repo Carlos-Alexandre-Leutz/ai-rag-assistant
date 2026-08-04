@@ -23,10 +23,13 @@
     "class-validator": "^0.14.4",
     "cookie-parser": "^1.4.7",
     "fastify": "^5.8.4",
+    "form-data": "^4.0.6",
     "jsonwebtoken": "^9.0.3",
+    "multer": "^2.2.0",
     "reflect-metadata": "^0.2.0",
     "rxjs": "^7.8.1",
-    "zod": "^4.3.6"
+    "zod": "^4.3.6",
+    "form-data": "^4.0.0"
   },
   "devDependencies": {
     "@nestjs/cli": "^11.0.16",
@@ -36,10 +39,13 @@
     "@swc/core": "^1.15.18",
     "@swc/jest": "^0.2.39",
     "@types/bcrypt": "^6.0.0",
+    "@types/form-data": "^2.5.2",
     "@types/jsonwebtoken": "^9.0.10",
+    "@types/multer": "^2.2.0",
     "@types/node": "^22.0.0",
     "dotenv": "^17.3.1",
     "jest": "^30.3.0",
-    "typescript": "^5.0.0"
+    "typescript": "^5.0.0",
+    "@types/form-data": "^2.5.0"
   }
 }

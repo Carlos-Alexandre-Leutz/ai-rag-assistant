@@ -1,16 +1,24 @@
 import { NestFactory } from '@nestjs/core';
+import * as dotenv from 'dotenv';
 import {
   FastifyAdapter,
   NestFastifyApplication,
 } from '@nestjs/platform-fastify';
+import multipart from '@fastify/multipart';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
+  dotenv.config();
   const app = await NestFactory.create<NestFastifyApplication>(
     AppModule,
     new FastifyAdapter()
   );
+
+  await app.register(multipart as any, {
+    attachFieldsToBody: 'keyValues',
+  });
+
   const allowedOrigins = process.env.ALLOWED_ORIGINS
     ? process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim())
     : ['https://web-staging-sbjp.onrender.com'];

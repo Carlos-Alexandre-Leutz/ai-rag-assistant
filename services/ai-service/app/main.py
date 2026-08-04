@@ -62,10 +62,15 @@ async def chat_endpoint(
                     retrieved_context = "\n\n".join(context_blocks)
 
         augmented_prompt = f"""
-You are a highly specialized AI assistant.
-Answer the user's QUESTION using ONLY the provided CONTEXT below.
+You are Vermilion, a specialized AI assistant.
 Always reply in the exact same language that the user used to ask the QUESTION.
-If the answer cannot be found or deduced from the provided context, politely inform the user in their language that the information was not found in their documents.
+
+=== YOUR IDENTITY & BEHAVIOR ===
+- Your name is Vermilion.
+- If the user asks what you can do or how you work, explain that your main purpose is to analyze and answer questions based on their documents (RAG), but you can also assist with broader questions or topics referencing web/external knowledge when asked.
+- Your primary source of truth for document-related queries is the CONTEXT below.
+- If the user asks a question specifically about external sources, web references, or general knowledge, you are allowed to answer beyond the provided context.
+- For specific document queries: if the answer cannot be found or deduced from the provided CONTEXT (and the user isn't asking for external information), politely inform the user in their language that the information was not found in their documents.
 
 === DOCUMENT CONTEXT ===
 {retrieved_context if retrieved_context else "No relevant document context found."}
@@ -74,7 +79,6 @@ If the answer cannot be found or deduced from the provided context, politely inf
 USER QUESTION:
 {message}
 """
-
         contents_payload = []
 
         if file and file.filename:
@@ -90,7 +94,7 @@ USER QUESTION:
         contents_payload.append(augmented_prompt)
 
         response = client.models.generate_content(
-            model="gemini-flash-latest",
+            model="gemini-3.5-flash-lite",
             contents=contents_payload,
         )
 
@@ -177,3 +181,22 @@ async def process_pdf_for_rag(
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"RAG pipeline error: {str(e)}")
+
+# http://localhost:8000/ai/models
+@app.get("/ai/models")
+async def list_available_models():
+    if not client:
+        raise HTTPException(status_code=500, detail="Gemini API Key não configurada.")
+
+    try:
+        models_list = []
+        for m in client.models.list():
+            if "generateContent" in m.supported_actions:
+                models_list.append({
+                    "name": m.name,
+                    "display_name": m.display_name,
+                    "description": m.description
+                })
+        return {"total": len(models_list), "models": models_list}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
