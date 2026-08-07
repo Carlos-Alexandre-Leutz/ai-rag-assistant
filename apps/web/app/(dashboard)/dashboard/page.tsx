@@ -1,6 +1,8 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import api from '@/lib/api';
 
 type Message = {
   id: string;
@@ -10,6 +12,7 @@ type Message = {
 };
 
 export default function DashboardPage() {
+  const router = useRouter();
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [messageText, setMessageText] = useState('');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -19,6 +22,13 @@ export default function DashboardPage() {
   const chatAreaRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    if (!token) {
+      router.push('/login');
+    }
+  }, [router]);
 
   const toggleDrawer = () => setIsDrawerOpen((prev) => !prev);
 
@@ -45,10 +55,13 @@ export default function DashboardPage() {
   const handleSendMessage = async () => {
     if ((!messageText.trim() && !selectedFile) || isLoading) return;
 
+    const currentText = messageText;
+    const currentFile = selectedFile;
+
     const userMessage: Message = {
       id: Date.now().toString(),
       sender: 'user',
-      text: selectedFile ? `Attached: ${selectedFile.name} | ${messageText}` : messageText,
+      text: currentFile ? `Attached: ${currentFile.name} | ${currentText}` : currentText,
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     };
 
@@ -63,31 +76,25 @@ export default function DashboardPage() {
     try {
       const formData = new FormData();
 
-      formData.append('user_id', 'user_123');
-      formData.append('message', userMessage.text);
+      formData.append('userId', 'user_123');
+      formData.append('message', currentText);
 
-      if (selectedFile) {
-        formData.append('file', selectedFile);
+      if (currentFile) {
+        formData.append('file', currentFile);
       }
 
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_BFF_URL}/chat`,
-        {
-          method: 'POST',
-          body: formData,
-        }
-      );
+      const response = await api.post('/chat', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
 
-      if (!response.ok) {
-        throw new Error('Failed to send message');
-      }
-
-      const data = await response.json();
+      const data = response.data;
 
       const aiMessage: Message = {
         id: (Date.now() + 1).toString(),
         sender: 'ai',
-        text: data.response || data[1] || 'I received your message, but I could not parse the response.',
+        text: data.response || data.message || 'I received your message, but I could not parse the response.',
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       };
 

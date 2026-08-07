@@ -20,7 +20,6 @@ export const FastifyFormData = createParamDecorator(
 
     const body = req.body as any;
 
-    // 💡 AQUI: Tipagem explícita para aceitar o objeto com o Buffer ou undefined
     let file:
       | { buffer: Buffer; filename: string; mimetype: string }
       | undefined = undefined;
