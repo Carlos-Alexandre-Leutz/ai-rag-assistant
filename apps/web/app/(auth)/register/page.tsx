@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import api from '@/lib/api';
 
 export default function RegisterPage() {
   const [name, setName] = useState('');
@@ -18,16 +19,12 @@ export default function RegisterPage() {
       return;
     }
 
-    const response = await fetch(`${process.env.NEXT_PUBLIC_BFF_URL}/auth/register`, {
-      method: 'POST',
-      body: JSON.stringify({ name, email, password }),
-      headers: { 'Content-Type': 'application/json' }
-    });
-
-    if (response.ok) {
+    try {
+      await api.post('/auth/register', { name, email, password });
       alert("Account created successfully!");
       router.push('/login');
-    } else {
+    } catch (error) {
+      console.error(error);
       alert("Error creating account!");
     }
   };

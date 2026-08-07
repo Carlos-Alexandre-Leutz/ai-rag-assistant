@@ -3,6 +3,7 @@
 import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
+import api from '@/lib/api';
 
 function ResetPasswordForm() {
   const searchParams = useSearchParams();
@@ -47,17 +48,7 @@ function ResetPasswordForm() {
     setLoading(true);
 
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_BFF_URL}/auth/reset-password`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token, newPassword }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.message || 'Error resetting the password.');
-      }
+      await api.post('/auth/reset-password', { token, newPassword });
 
       setSuccess(true);
 
@@ -66,7 +57,7 @@ function ResetPasswordForm() {
       }, 3000);
 
     } catch (err: any) {
-      setError(err.message || 'An unexpected error occurred.');
+      setError(err.response?.data?.message || 'An unexpected error occurred.');
     } finally {
       setLoading(false);
     }

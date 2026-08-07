@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import api from '@/lib/api';
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState('');
@@ -10,15 +11,11 @@ export default function ForgotPasswordPage() {
   const handleResetRequest = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    const response = await fetch(`${process.env.NEXT_PUBLIC_BFF_URL}/auth/forgot-password`, {
-      method: 'POST',
-      body: JSON.stringify({ email }),
-      headers: { 'Content-Type': 'application/json' }
-    });
-
-    if (response.ok) {
+    try {
+      await api.post('/auth/forgot-password', { email });
       setIsSent(true);
-    } else {
+    } catch (error) {
+      console.error(error);
       alert("Error: User not found or server error.");
     }
   };

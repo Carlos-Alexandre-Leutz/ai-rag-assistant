@@ -1,9 +1,7 @@
-version: '3.8'
-
 services:
 
   db:
-    image: postgres:16-alpine
+    image: pgvector/pgvector:pg16
     container_name: saas-postgres-db
     restart: always
     environment:
@@ -14,7 +12,6 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-
 
   api-tasks:
     build:
@@ -37,8 +34,11 @@ services:
       - "3001:3001"
     depends_on:
       - api-tasks
+      - ai-service
     environment:
       - TASKS_API_URL=http://api-tasks:3002
+      - AI_SERVICE_URL=http://ai-service:8000
+      - ALLOWED_ORIGINS=http://localhost:3000
 
   frontend:
     build:
@@ -49,6 +49,19 @@ services:
       - "3000:3000"
     environment:
       - NEXT_PUBLIC_BFF_URL=http://localhost:3001
+
+  ai-service:
+    build:
+      context: .
+      dockerfile: Dockerfile.ai
+    container_name: saas_ai_service
+    ports:
+      - "8000:8000"
+    env_file:
+      - ./services/ai-service/.env
+    environment:
+      - PORT=8000
+    restart: always
 
 volumes:
   postgres_data:

@@ -6,9 +6,6 @@ import { ResetPasswordDto } from './dto/reset-password.dto';
 import { LoginDto } from './dto/login.dto';
 import axios from 'axios';
 
-
-
-
 @Controller('auth')
 export class AuthController {
   private readonly coreAuthUrl = process.env.TASKS_API_URL;
