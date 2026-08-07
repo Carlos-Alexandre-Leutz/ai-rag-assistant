@@ -5,6 +5,9 @@
 
 This project is a **High-Performance Monorepo** orchestrated by **Turborepo** and managed by **pnpm**. This setup ensures efficient dependency sharing, fast builds via remote caching, and a clean separation between the **BFF (NestJS)** and **Frontend (Next.js)**.
 
+<img width="1855" height="931" alt="image" src="https://github.com/user-attachments/assets/5ec643f8-c398-41e3-b3a9-ac60779706d7" />
+
+
 ## 🚀 Deployment & Infrastructure
 
 This project follows professional software engineering standards, utilizing a multi-environment strategy to ensure high availability and continuous delivery.
