@@ -21,7 +21,6 @@ export default function RegisterPage() {
 
     try {
       await api.post('/auth/register', { name, email, password });
-      alert("Account created successfully!");
       router.push('/login');
     } catch (error) {
       console.error(error);

@@ -20,6 +20,9 @@ COPY turbo.json turbo.json
 
 RUN pnpm --filter=@saas/api-tasks exec prisma generate --schema=./prisma/schema.prisma
 
+ARG NEXT_PUBLIC_BFF_URL
+ENV NEXT_PUBLIC_BFF_URL=$NEXT_PUBLIC_BFF_URL
+
 RUN pnpm turbo build
 
 FROM base AS runner

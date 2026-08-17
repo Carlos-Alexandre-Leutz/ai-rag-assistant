@@ -10,6 +10,7 @@ export const FastifyFormData = createParamDecorator(
       return {
         userId: (stream.fields.user_id as any)?.value,
         message: (stream.fields.message as any)?.value,
+        messagesCount: (stream.fields.messagesCount as any)?.value,
         file: {
           buffer: await stream.toBuffer(),
           filename: stream.filename,
@@ -42,6 +43,7 @@ export const FastifyFormData = createParamDecorator(
     return {
       userId: body?.user_id,
       message: body?.message,
+      messagesCount: body?.messagesCount,
       file,
     };
   },
