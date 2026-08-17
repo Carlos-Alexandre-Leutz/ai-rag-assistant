@@ -12,6 +12,7 @@ type Message = {
 
 export default function DashboardPage() {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(false); // <--- ESTADO DE AUTH
   const [messageText, setMessageText] = useState('');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -19,7 +20,8 @@ export default function DashboardPage() {
 
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [guestId, setGuestId] = useState<string>('');
-  const [messagesCount, setMessagesCount] = useState<number>(0); // <--- ESTADO DA CONTAGEM
+  const [messagesCount, setMessagesCount] = useState<number>(0);
+  const [userName, setUserName] = useState<string>('');
 
   const chatAreaRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -28,6 +30,14 @@ export default function DashboardPage() {
   const toggleDrawer = () => setIsDrawerOpen((prev) => !prev);
 
   useEffect(() => {
+    const token = localStorage.getItem('token');
+    setIsAuthenticated(!!token && token !== 'undefined' && token !== 'null');
+
+    const name = localStorage.getItem('user_name');
+    if (name) {
+      setUserName(name);
+    }
+
     let storedGuestId = localStorage.getItem('guest_session_id');
     if (!storedGuestId) {
       storedGuestId = `guest_${crypto.randomUUID()}`;
@@ -59,7 +69,10 @@ export default function DashboardPage() {
   const handleSendMessage = async () => {
     if ((!messageText.trim() && !selectedFile) || isLoading) return;
 
-    if (messagesCount >= 10) {
+    const token = localStorage.getItem('token');
+    const isAuthenticated = !!token && token !== 'undefined' && token !== 'null';
+
+    if (!isAuthenticated && messagesCount >= 10) {
       setShowAuthModal(true);
       return;
     }
@@ -84,26 +97,34 @@ export default function DashboardPage() {
     try {
       const formData = new FormData();
 
-      formData.append('guestId', guestId);
+      if (!isAuthenticated) {
+        formData.append('guestId', guestId);
+        formData.append('messagesCount', String(messagesCount));
+        formData.append('isGuest', 'true');
+      }
+
       formData.append('message', currentText);
-      formData.append('messagesCount', String(messagesCount));
-      formData.append('isGuest', 'true');
 
       if (currentFile) {
         formData.append('file', currentFile);
       }
 
-      const response = await api.post('/chat', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-          'x-guest-id': guestId,
-        },
-      });
+      const headers: any = {
+        'Content-Type': 'multipart/form-data',
+      };
+
+      if (!isAuthenticated) {
+        headers['x-guest-id'] = guestId;
+      }
+
+      const response = await api.post('/chat', formData, { headers });
 
       const data = response.data;
 
-      const updatedCount = typeof data.messagesCount === 'number' ? data.messagesCount : messagesCount + 1;
-      setMessagesCount(updatedCount);
+      if (!isAuthenticated) {
+        const updatedCount = typeof data.messagesCount === 'number' ? data.messagesCount : messagesCount + 1;
+        setMessagesCount(updatedCount);
+      }
 
       const aiMessage: Message = {
         id: (Date.now() + 1).toString(),
@@ -116,7 +137,7 @@ export default function DashboardPage() {
     } catch (error: any) {
       console.error('Error sending message:', error);
 
-      if (error.response?.status === 403 || error.response?.data?.requiresAuth) {
+      if (!isAuthenticated && (error.response?.status === 403 || error.response?.data?.requiresAuth)) {
         setShowAuthModal(true);
       } else {
         const errorMessage: Message = {
@@ -188,9 +209,15 @@ export default function DashboardPage() {
             <h1 className="text-2xl font-bold text-[#dae2fd]">Vermilion</h1>
           </div>
 
-          <div className="text-xs font-mono text-[#e5bdbe]/80 bg-[#171f33] border border-[#5c3f40] px-3 py-1 rounded-full">
-            Perguntas: <span className="text-[#ffb3b6] font-bold">{messagesCount}</span>/10
-          </div>
+          {isAuthenticated ? (
+            <div className="text-sm font-bold text-[#dae2fd]">
+              Hi, {userName}
+            </div>
+          ) : (
+            <div className="text-xs font-mono text-[#e5bdbe]/80 bg-[#171f33] border border-[#5c3f40] px-3 py-1 rounded-full">
+              Free questions: <span className="text-[#ffb3b6] font-bold">{messagesCount}</span>/10
+            </div>
+          )}
         </header>
 
         <div
