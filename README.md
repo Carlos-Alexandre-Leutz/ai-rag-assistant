@@ -16,7 +16,7 @@ This project follows professional software engineering standards, utilizing a mu
 The staging environment is hosted on **Render**.
 > **Note:** Since it uses Render's free tier, the services may experience a **"Cold Start"** (30-50 seconds delay) if they haven't been accessed recently. Once awake, performance is stable.
 
-* **Frontend:** [web-staging-sbjp.onrender.com](https://web-staging-sbjp.onrender.com)
+* **Frontend:** [web-staging-sbjp.onrender.com](https://carlos-alexandre-leutz.github.io/ai-rag-assistant/)
 * **BFF (Backend for Frontend):** [bff-staging.onrender.com](https://bff-staging.onrender.com)
 * **Core API:** [saas-business-manager.onrender.com](https://saas-business-manager.onrender.com)
 
