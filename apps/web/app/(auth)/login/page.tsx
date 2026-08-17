@@ -17,6 +17,9 @@ export default function LoginPage() {
 
       if (response.data.access_token) {
         localStorage.setItem('token', response.data.access_token);
+        if (response.data.name) {
+          localStorage.setItem('user_name', response.data.name);
+        }
         router.push('/dashboard');
       } else {
         alert('Erro ao logar!');
