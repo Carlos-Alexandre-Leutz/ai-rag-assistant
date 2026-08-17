@@ -14,22 +14,26 @@ export class AuthGuard implements CanActivate {
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest<FastifyRequest>();
     const token = this.extractTokenFromHeader(request);
+    const guestId = request.headers['x-guest-id'];
 
-    if (!token) {
-      throw new UnauthorizedException('Token de acesso não fornecido.');
+    if (token) {
+      try {
+        const payload = await this.jwtService.verifyAsync(token, {
+          secret: process.env.JWT_SECRET || 'seu_secret_aqui',
+        });
+        (request as any).user = payload;
+        return true;
+      } catch (e) {
+        console.log('DEBUG: Token invalid or expired, falling back to guest');
+      }
     }
 
-    try {
-      const payload = await this.jwtService.verifyAsync(token, {
-        secret: process.env.JWT_SECRET || 'seu_secret_aqui',
-      });
-
-      (request as any).user = payload;
-    } catch {
-      throw new UnauthorizedException('Token inválido ou expirado.');
+    if (guestId) {
+      (request as any).user = { isGuest: true, id: guestId };
+      return true;
     }
 
-    return true;
+    throw new UnauthorizedException('Token inválido ou não fornecido.');
   }
 
   private extractTokenFromHeader(request: FastifyRequest): string | undefined {

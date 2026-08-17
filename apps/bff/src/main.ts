@@ -18,15 +18,15 @@ async function bootstrap() {
   await app.register(multipart as any, {
     attachFieldsToBody: 'keyValues',
   });
-
   const allowedOrigins = process.env.ALLOWED_ORIGINS
     ? process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim())
-    : ['https://web-staging-sbjp.onrender.com'];
+    : ['http://localhost:3000',];
 
   app.enableCors({
     origin: allowedOrigins,
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
     credentials: true,
+    allowedHeaders: 'Content-Type,Authorization,x-guest-id',
   });
 
   const config = new DocumentBuilder()

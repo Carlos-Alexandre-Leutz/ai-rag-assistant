@@ -49,6 +49,8 @@ services:
       - ./apps/bff/.env
     environment:
       - WATCHPACK_POLLING=true
+      - CHOKIDAR_USEPOLLING=true
+      - LEGACY_WATCHER=true
 
   frontend:
     build:
@@ -59,9 +61,8 @@ services:
       - .:/app
       - /app/node_modules
       - /app/apps/web/node_modules
-      - /app/apps/web/node_modules/.pnpm
-      - /app/node_modules/.pnpm
-      - /app/.pnpm-store
+      - /app/apps/web/.next
+      - /app/apps/web/.turbo
     ports:
       - "3000:3000"
     env_file:
@@ -70,6 +71,7 @@ services:
       - WATCHPACK_POLLING=true
       - CHOKIDAR_USEPOLLING=true
       - NEXT_WEBPACK_USEPOLLING=true
+      - FAST_REFRESH=true
 
   ai-service:
     build:

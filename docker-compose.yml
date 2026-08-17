@@ -17,7 +17,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    command: pnpm --filter api-tasks start
+    command: sh -c "npx prisma migrate deploy --schema apps/api-tasks/prisma/schema.prisma && pnpm --filter api-tasks start"
     ports:
       - "3002:3002"
     depends_on:
@@ -44,6 +44,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        - NEXT_PUBLIC_BFF_URL=http://localhost:3001
     command: pnpm --filter web start
     ports:
       - "3000:3000"

@@ -11,14 +11,22 @@ export class ChatController {
   @Post()
   async chat(
     @Req() req: any,
-    @FastifyFormData() payload: { userId: string; message: string; file?: any },
+    @FastifyFormData() payload: { userId: string; message: string; file?: any; messagesCount?: number },
   ) {
-    const authenticatedUserId = req.user?.sub || req.user?.id || payload.userId;
+    console.log("chat request received, payload:", payload);
+
+    const isGuest = !!req.user?.isGuest;
+    const authenticatedUserId = req.user?.id || req.user?.sub || payload.userId;
+    const messagesCount = Number(payload.messagesCount) || 0;
+
+    console.log("Processing chat for", isGuest ? "guest" : "user", "with count", messagesCount);
 
     return this.chatService.chat(
       authenticatedUserId,
       payload.message,
+      messagesCount,
       payload.file,
+      isGuest,
     );
   }
 }

@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
 import api from '@/lib/api';
 
 type Message = {
@@ -12,25 +11,30 @@ type Message = {
 };
 
 export default function DashboardPage() {
-  const router = useRouter();
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [messageText, setMessageText] = useState('');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [guestId, setGuestId] = useState<string>('');
+  const [messagesCount, setMessagesCount] = useState<number>(0); // <--- ESTADO DA CONTAGEM
+
   const chatAreaRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
-    const token = localStorage.getItem('token');
-    if (!token) {
-      router.push('/login');
-    }
-  }, [router]);
-
   const toggleDrawer = () => setIsDrawerOpen((prev) => !prev);
+
+  useEffect(() => {
+    let storedGuestId = localStorage.getItem('guest_session_id');
+    if (!storedGuestId) {
+      storedGuestId = `guest_${crypto.randomUUID()}`;
+      localStorage.setItem('guest_session_id', storedGuestId);
+    }
+    setGuestId(storedGuestId);
+  }, []);
 
   useEffect(() => {
     if (chatAreaRef.current) {
@@ -55,6 +59,11 @@ export default function DashboardPage() {
   const handleSendMessage = async () => {
     if ((!messageText.trim() && !selectedFile) || isLoading) return;
 
+    if (messagesCount >= 10) {
+      setShowAuthModal(true);
+      return;
+    }
+
     const currentText = messageText;
     const currentFile = selectedFile;
 
@@ -67,7 +76,6 @@ export default function DashboardPage() {
 
     setMessages((prev) => [...prev, userMessage]);
 
-    // Reset inputs
     setMessageText('');
     setSelectedFile(null);
     if (textareaRef.current) textareaRef.current.style.height = 'auto';
@@ -76,8 +84,10 @@ export default function DashboardPage() {
     try {
       const formData = new FormData();
 
-      formData.append('userId', 'user_123');
+      formData.append('guestId', guestId);
       formData.append('message', currentText);
+      formData.append('messagesCount', String(messagesCount));
+      formData.append('isGuest', 'true');
 
       if (currentFile) {
         formData.append('file', currentFile);
@@ -86,10 +96,14 @@ export default function DashboardPage() {
       const response = await api.post('/chat', formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
+          'x-guest-id': guestId,
         },
       });
 
       const data = response.data;
+
+      const updatedCount = typeof data.messagesCount === 'number' ? data.messagesCount : messagesCount + 1;
+      setMessagesCount(updatedCount);
 
       const aiMessage: Message = {
         id: (Date.now() + 1).toString(),
@@ -99,15 +113,20 @@ export default function DashboardPage() {
       };
 
       setMessages((prev) => [...prev, aiMessage]);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error sending message:', error);
-      const errorMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        sender: 'ai',
-        text: 'Sorry, I encountered an error while processing your request.',
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      };
-      setMessages((prev) => [...prev, errorMessage]);
+
+      if (error.response?.status === 403 || error.response?.data?.requiresAuth) {
+        setShowAuthModal(true);
+      } else {
+        const errorMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          sender: 'ai',
+          text: 'Sorry, I encountered an error while processing your request.',
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        };
+        setMessages((prev) => [...prev, errorMessage]);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -146,7 +165,12 @@ export default function DashboardPage() {
           </button>
         </div>
 
-        <button className="w-full flex items-center justify-center gap-2 bg-[#e11d48] text-[#fffaf9] rounded-lg font-bold py-3 px-4 transition-all duration-200 hover:brightness-110 active:scale-95">
+        <button
+          onClick={() => {
+            setShowAuthModal(true);
+          }}
+          className="w-full flex items-center justify-center gap-2 bg-[#e11d48] text-[#fffaf9] rounded-lg font-bold py-3 px-4 transition-all duration-200 hover:brightness-110 active:scale-95"
+        >
           <span className="material-symbols-outlined">add</span>
           <span className="font-mono text-xs">New Chat</span>
         </button>
@@ -162,6 +186,10 @@ export default function DashboardPage() {
               <span className="material-symbols-outlined">menu</span>
             </button>
             <h1 className="text-2xl font-bold text-[#dae2fd]">Vermilion</h1>
+          </div>
+
+          <div className="text-xs font-mono text-[#e5bdbe]/80 bg-[#171f33] border border-[#5c3f40] px-3 py-1 rounded-full">
+            Perguntas: <span className="text-[#ffb3b6] font-bold">{messagesCount}</span>/10
           </div>
         </header>
 
@@ -259,6 +287,42 @@ export default function DashboardPage() {
           </div>
         </div>
       </main>
+
+      {showAuthModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+          <div className="bg-[#131b2e] border border-[#5c3f40] rounded-2xl p-6 max-w-md w-full text-center shadow-2xl">
+            <div className="w-12 h-12 bg-[#2d3449] border border-[#5c3f40] rounded-2xl flex items-center justify-center mx-auto mb-4">
+              <span className="material-symbols-outlined text-[#ffb3b6] text-2xl">
+                lock
+              </span>
+            </div>
+            <h3 className="text-xl font-bold text-[#dae2fd] mb-2">Gostou da experiência?</h3>
+            <p className="text-[#e5bdbe] text-sm mb-6">
+              You have reached the question limit for the free trial. Create an account to continue chatting, save your chats, and send documents without restrictions.
+            </p>
+            <div className="flex flex-col gap-3">
+              <a
+                href="/register"
+                className="w-full py-3 bg-[#e11d48] hover:brightness-110 font-bold rounded-xl text-[#fffaf9] transition-all text-center"
+              >
+                Create a Free Account
+              </a>
+              <a
+                href="/login"
+                className="w-full py-3 bg-[#2d3449] hover:bg-[#3d455d] border border-[#5c3f40] font-semibold rounded-xl text-[#dae2fd] transition-all text-center"
+              >
+                I already have an account.
+              </a>
+              <button
+                onClick={() => setShowAuthModal(false)}
+                className="text-xs text-[#e5bdbe]/60 hover:text-[#dae2fd] transition-colors mt-2"
+              >
+                Continue viewing only
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
