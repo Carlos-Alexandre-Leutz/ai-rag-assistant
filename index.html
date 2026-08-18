@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Starting Demo | Vermilion SaaS</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { background-color: #0b1326; color: #dae2fd; font-family: sans-serif; }
+  </style>
+</head>
+<body class="flex items-center justify-center h-screen p-4">
+  <div class="max-w-md w-full bg-[#131b2e] border border-[#5c3f40] rounded-2xl p-8 text-center shadow-2xl space-y-6">
+
+    <div class="flex justify-center">
+      <div class="w-12 h-12 border-4 border-[#e11d48] border-t-transparent rounded-full animate-spin"></div>
+    </div>
+
+    <div>
+      <h1 class="text-2xl font-bold text-[#ffb3b6]">Initializing Environment</h1>
+      <p class="text-xs text-[#e5bdbe] mt-2">
+        Please wait a moment while we wake up the microservices and AI infrastructure on Render...
+      </p>
+    </div>
+
+    <!-- Lista de Status dos Serviços -->
+    <div id="status-list" class="space-y-2 text-xs font-mono text-left bg-[#0b1326] p-4 rounded-xl border border-[#5c3f40]">
+      <div id="status-web" class="flex justify-between items-center text-[#e5bdbe]">
+        <span>Web Frontend</span>
+        <span class="text-amber-400">Starting...</span>
+      </div>
+      <div id="status-api" class="flex justify-between items-center text-[#e5bdbe]">
+        <span>API Tasks</span>
+        <span class="text-amber-400">Starting...</span>
+      </div>
+      <div id="status-bff" class="flex justify-between items-center text-[#e5bdbe]">
+        <span>BFF Service</span>
+        <span class="text-amber-400">Starting...</span>
+      </div>
+      <div id="status-ai" class="flex justify-between items-center text-[#e5bdbe]">
+        <span>AI Service</span>
+        <span class="text-amber-400">Starting...</span>
+      </div>
+    </div>
+
+    <p class="text-[10px] text-[#e5bdbe]/60">
+      *Containers in Free mode on Render take about 30–50 seconds to initialize upon first access.
+    </p>
+  </div>
+
+  <script>
+    const TARGET_URL = "https://web-staging-sbjp.onrender.com";
+
+    const services = [
+      { id: 'status-web', url: 'https://web-staging-sbjp.onrender.com' },
+      { id: 'status-api', url: 'https://saas-business-manager.onrender.com' },
+      { id: 'status-bff', url: 'https://bff-staging.onrender.com/docs' },
+      { id: 'status-ai', url: 'https://ai-service-2z1l.onrender.com/health' }
+    ];
+
+    async function pingService(service) {
+      const element = document.getElementById(service.id).querySelector('span:last-child');
+      let success = false;
+
+      while (!success) {
+        try {
+          await fetch(service.url, { mode: 'no-cors' });
+          element.innerText = "Online ✓";
+          element.className = "text-emerald-400 font-bold";
+          success = true;
+        } catch (err) {
+          element.innerText = "Aguardando...";
+          await new Promise(r => setTimeout(r, 3000));
+        }
+      }
+    }
+
+    async function startWarmup() {
+      await Promise.all(services.map(pingService));
+
+      setTimeout(() => {
+        window.location.href = TARGET_URL;
+      }, 1000);
+    }
+
+    startWarmup();
+  </script>
+</body>
+</html>

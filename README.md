@@ -1,244 +1,73 @@
 
-# SaaS Business Manager
+---
 
-A modern SaaS platform architecture designed to simulate real-world production environments.
+### 📂 **Monorepo Architecture & Setup**
 
-This project focuses on scalability, separation of concerns, and best practices used in professional software development.
+This project is a **High-Performance Monorepo** orchestrated by **Turborepo** and managed by **pnpm**. This setup ensures efficient dependency sharing, fast builds via remote caching, and a clean separation between the **BFF (NestJS)** and **Frontend (Next.js)**.
+
+<img width="1855" height="931" alt="image" src="https://github.com/user-attachments/assets/5ec643f8-c398-41e3-b3a9-ac60779706d7" />
+
+
+## 🚀 Deployment & Infrastructure
+
+This project follows professional software engineering standards, utilizing a multi-environment strategy to ensure high availability and continuous delivery.
+
+### 🧪 Staging Environment (HML)
+The staging environment is hosted on **Render**.
+> **Note:** Since it uses Render's free tier, the services may experience a **"Cold Start"** (30-50 seconds delay) if they haven't been accessed recently. Once awake, performance is stable.
+
+* **Frontend:** [web-staging-sbjp.onrender.com](https://carlos-alexandre-leutz.github.io/ai-rag-assistant/)
+* **BFF (Backend for Frontend):** [bff-staging.onrender.com](https://bff-staging.onrender.com)
+* **Core API:** [saas-business-manager.onrender.com](https://saas-business-manager.onrender.com)
+
+### 🏗️ Tech Stack & DevOps
+* **Database:** Utilizing **Neon.tech**, a serverless PostgreSQL with autoscaling capabilities and point-in-time recovery.
+* **CI/CD Pipeline:** Fully automated via **GitHub Actions**. Every push to the `main` or `develop` branch triggers automated builds, linting, and deployment.
+* **Infrastructure Strategy:** I've implemented a separation of concerns between the API, BFF, and Web layers, all orchestrated within a **Turborepo** monorepo for maximum performance during development and deployment.
 
 ---
 
-## 📌 Project Goal
-
-The goal of this project is to build a complete SaaS application for small business management, including features such as:
-
-* User management
-* Product management
-* Order management
-* Dashboard and analytics
-
-It also serves as a portfolio project to demonstrate real-world architecture patterns.
+#### **Prerequisites**
+* **Node.js**: v18 or higher.
+* **pnpm**: v9.0.0 or higher.
+  > If not installed, run: `sudo corepack enable`
 
 ---
 
----
-
-### 🚀 Management & Roadmap
-
-This is a **SaaS** developed to showcase my skills as both **Product Owner** and **Developer**. The entire agile workflow is managed using **GitHub Projects**.
-
-📌 **Project Backlog:** [View Tasks & Progress](https://github.com/users/Carlos-Alexandre-Leutz/projects/2/views/1)
-
----
-
-## 🚧 Project Status
-
-In development
-
----
-
-## 🏗️ Project Structure
-
-```
-saas-platform/
-
-apps/
-   web/
-   bff/
-
-services/
-   api/
-
-infra/
-docs/
-```
-
----
-
-## 📦 Applications
-
-### apps/web (Frontend)
-
-The frontend application built with modern web technologies.
-
-**Tech Stack**
-
-* Next.js
-* React
-* TypeScript
-* Tailwind CSS
-
-**Responsibilities**
-
-* User interface
-* Dashboard
-* Forms and management screens
-* Communication with BFF via API
-
----
-
-### apps/bff (Backend for Frontend)
-
-The BFF acts as an intermediary layer between the frontend and backend services.
-
-**Tech Stack**
-
-* Node.js
-* NestJS
-
-**Responsibilities**
-
-* Adapt backend data for frontend needs
-* Centralize authentication and authorization
-* Aggregate data from multiple services
-* Reduce direct frontend-backend coupling
-* Expose optimized endpoints for UI
-
-**Flow**
-
-```
-Frontend → BFF → Backend API
-```
-
----
-
-## 🔧 Services
-
-### services/api (Core Backend)
-
-Main backend service responsible for business logic and data management.
-
-**Tech Stack**
-
-* Node.js
-* NestJS
-* PostgreSQL
-* Prisma ORM
-
-**Responsibilities**
-
-* Business logic
-* Data persistence
-* User management
-* Product management
-* Order processing
-
----
-
-## ⚙️ Infrastructure
-
-The `infra` folder contains infrastructure-related configurations.
-
-**Examples**
-
-* Docker
-* Docker Compose
-* Environment configuration
-* CI/CD pipelines
-* Deployment scripts
-
----
-
-## 📚 Documentation
-
-The `docs` folder contains technical documentation such as:
-
-* Architecture diagrams
-* API documentation
-* Architecture decisions (ADR)
-* System flows
-
----
-
-## 🧠 System Architecture
-
-```
-Frontend (Next.js)
-        │
-        ▼
-BFF (NestJS)
-        │
-        ▼
-Backend API (NestJS)
-        │
-        ▼
-PostgreSQL Database
-```
-
----
-
-## 🌐 Local Development URLs
-
-### Frontend
-
-```
-http://localhost:3000
-```
-
-User interface, dashboards, and management features.
-
----
-
-### BFF API
-
-```
-http://localhost:3001
-```
-
-Handles:
-
-* API requests from frontend
-* Authentication
-* Data aggregation
-* Communication with backend services
-
----
-
-### API Documentation (Swagger)
-
-```
-http://localhost:3001/docs
-```
-
-Allows developers to:
-
-* Explore endpoints
-* Test requests
-* View schemas
-* Understand API behavior
-
----
-
-## ▶️ Getting Started
-
+#### **1. Initial Installation**
+From the root directory, install all dependencies for every application and package within the workspace:
 ```bash
-# install dependencies
-npm install
-
-# run frontend
-cd apps/web
-npm run dev
-
-# run BFF
-cd apps/bff
-npm run dev
+pnpm install
 ```
 
+#### **2. Environment Configuration**
+Navigate to the BFF directory to set up your environment variables (required for **Prisma ORM**):
+```bash
+cd apps/bff
+cp .env.example .env
+```
+
+#### **3. Running in Development**
+To launch the entire ecosystem (BFF + Frontend) simultaneously with a single command:
+```bash
+pnpm dev
+```
+> **Note:** Turborepo will handle parallel execution and provide a unified log stream for both services.
+
 ---
 
-## 💡 Architecture Principles
-
-This project follows key software engineering principles:
-
-* Separation of concerns
-* Scalability
-* Maintainability
-* Decoupled architecture
-* Real-world SaaS patterns
+### 🛠 **Tech Stack**
+* **Monorepo Manager**: [Turborepo](https://turbo.build/)
+* **Package Manager**: [pnpm](https://pnpm.io/) (Content-addressable storage)
+* **Backend (BFF)**: [NestJS](https://nestjs.com/) + [Fastify](https://www.fastify.io/)
+* **ORM**: [Prisma](https://www.prisma.io/)
+* **Frontend**: [Next.js](https://nextjs.org/)
 
 ---
 
-## 📈 Why This Project Matters
-
-This project was designed to reflect how modern SaaS applications are built in production environments, making it a strong portfolio piece for developers aiming to work in professional teams.
+### **Why this setup?**
+* **Scalability:** The `pnpm-workspace.yaml` structure allows us to scale to dozens of microservices without duplicating `node_modules`.
+* **Reliability:** By using `packageManager` enforcement, we ensure all developers and CI/CD pipelines use the exact same environment.
+* **Speed:** Turbo's caching mechanism significantly reduces build times for international-level production deployments.
 
 ---

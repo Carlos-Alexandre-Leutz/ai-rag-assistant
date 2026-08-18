@@ -1,0 +1,92 @@
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    container_name: saas-postgres-db
+    restart: always
+    environment:
+      POSTGRES_USER: alexandre
+      POSTGRES_PASSWORD: mysecretpassword
+      POSTGRES_DB: saas_business_manager
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  api-tasks:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    command: sh -c "pnpm --filter api-tasks exec prisma generate --schema=prisma/schema.prisma && pnpm --filter api-tasks exec prisma db push && pnpm --filter api-tasks dev"
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - /app/apps/api-tasks/node_modules
+    ports:
+      - "3002:3002"
+    depends_on:
+      - db
+    env_file:
+      - ./apps/api-tasks/.env
+    environment:
+      - WATCHPACK_POLLING=true
+
+  bff:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    command: pnpm --filter bff dev
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - /app/apps/bff/node_modules
+      - /app/node_modules/.pnpm
+      - /app/.pnpm-store
+    ports:
+      - "3001:3001"
+    depends_on:
+      - api-tasks
+    env_file:
+      - ./apps/bff/.env
+    environment:
+      - WATCHPACK_POLLING=true
+      - CHOKIDAR_USEPOLLING=true
+      - LEGACY_WATCHER=true
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    command: pnpm --filter web dev
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - /app/apps/web/node_modules
+      - /app/apps/web/.next
+      - /app/apps/web/.turbo
+    ports:
+      - "3000:3000"
+    env_file:
+      - ./apps/web/.env
+    environment:
+      - WATCHPACK_POLLING=true
+      - CHOKIDAR_USEPOLLING=true
+      - NEXT_WEBPACK_USEPOLLING=true
+      - FAST_REFRESH=true
+
+  ai-service:
+    build:
+      context: .
+      dockerfile: Dockerfile.ai.dev
+    container_name: saas_ai_service_dev
+    ports:
+      - "8000:8000"
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    env_file:
+      - ./services/ai-service/.env
+    environment:
+      - PORT=8000
+    volumes:
+      - ./services/ai-service:/app
+
+volumes:
+  postgres_data:
