@@ -16,6 +16,8 @@ type ChatsContextValue = {
   handleExpiredSession: () => void;
 };
 
+const POLL_INTERVAL_MS = 3000;
+
 const ChatsContext = createContext<ChatsContextValue | null>(null);
 
 export const useChats = () => {
@@ -62,6 +64,15 @@ export function ChatsProvider({ children }: { children: React.ReactNode }) {
       setAuth('guest');
     }
   }, [refreshChats]);
+
+  // While a document is still being processed, keep the list fresh so the
+  // sidebar badge turns into READY / FAILED without a manual reload.
+  const hasProcessing = chats.some((c) => c.document?.status === 'PROCESSING');
+  useEffect(() => {
+    if (!hasProcessing) return;
+    const timer = setInterval(refreshChats, POLL_INTERVAL_MS);
+    return () => clearInterval(timer);
+  }, [hasProcessing, refreshChats]);
 
   const logout = () => {
     clearSession();

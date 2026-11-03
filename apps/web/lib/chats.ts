@@ -5,7 +5,11 @@ export type ChatSummary = {
   title: string;
   documentId: string;
   updatedAt: string;
-  document: { filename: string; status: 'PROCESSING' | 'READY' | 'FAILED' };
+  document: {
+    filename: string;
+    status: 'PROCESSING' | 'READY' | 'FAILED';
+    failureReason?: string | null;
+  };
 };
 
 export type ChatMessage = {

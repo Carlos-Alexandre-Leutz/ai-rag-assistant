@@ -61,13 +61,25 @@ export default function ChatPage() {
     };
   }, [auth, chatId, router, handleExpiredSession]);
 
+  // Document still processing: poll until it is READY or FAILED.
+  const documentStatus = chat?.document?.status;
+  useEffect(() => {
+    if (documentStatus !== 'PROCESSING') return;
+    const timer = setInterval(() => {
+      getChat(chatId)
+        .then(setChat)
+        .catch((err) => isUnauthorized(err) && handleExpiredSession());
+    }, 3000);
+    return () => clearInterval(timer);
+  }, [documentStatus, chatId, handleExpiredSession]);
+
   useEffect(() => {
     if (chatAreaRef.current) chatAreaRef.current.scrollTop = chatAreaRef.current.scrollHeight;
   }, [messages, sending]);
 
   const handleSend = async () => {
     const content = text.trim();
-    if (!content || sending) return;
+    if (!content || sending || documentStatus !== 'READY') return;
 
     const optimistic: ChatMessage = {
       id: `tmp-${Date.now()}`,
@@ -117,9 +129,21 @@ export default function ChatPage() {
         <h1 className="text-lg font-bold truncate">{chat?.title ?? '...'}</h1>
       </header>
 
+      {documentStatus === 'PROCESSING' && (
+        <div className="px-4 py-3 text-sm text-[#e5bdbe] bg-[#171f33] border-b border-[#5c3f40] animate-pulse">
+          Processing your document... You can ask questions as soon as it is ready.
+        </div>
+      )}
+      {documentStatus === 'FAILED' && (
+        <div className="px-4 py-3 text-sm text-[#ffb4ab] bg-[#171f33] border-b border-[#5c3f40]">
+          Could not process this document: {chat?.document?.failureReason || 'Unknown error.'} You
+          can delete this chat from the sidebar.
+        </div>
+      )}
+
       <div ref={chatAreaRef} className="flex-1 overflow-y-auto p-4 pt-8 pb-40">
         <div className="max-w-[800px] mx-auto space-y-8">
-          {!loadingChat && messages.length === 0 && !error && (
+          {!loadingChat && messages.length === 0 && !error && documentStatus === 'READY' && (
             <p className="text-center text-[#e5bdbe]/70">
               Ask anything about <b>{chat?.title}</b>.
             </p>
@@ -166,14 +190,19 @@ export default function ChatPage() {
               onChange={handleInput}
               onKeyDown={handleKeyDown}
               className="flex-1 bg-transparent border-none focus:outline-none focus:ring-0 text-[#dae2fd] placeholder-[#e5bdbe]/60 py-3 px-3 text-sm resize-none max-h-48"
-              placeholder="Ask a question about this document..."
+              placeholder={
+                documentStatus === 'READY'
+                  ? 'Ask a question about this document...'
+                  : 'Waiting for the document to be ready...'
+              }
+              disabled={documentStatus !== 'READY'}
               rows={1}
             />
             <button
               className="p-3 bg-[#ffb3b6] text-[#68001a] rounded-full hover:brightness-110 active:scale-90 transition-all flex-shrink-0 shadow-lg disabled:opacity-60"
               title="Send message"
               onClick={handleSend}
-              disabled={sending || !text.trim()}
+              disabled={sending || !text.trim() || documentStatus !== 'READY'}
             >
               <span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 1" }}>
                 send

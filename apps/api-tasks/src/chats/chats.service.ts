@@ -2,6 +2,8 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { DocumentStatus, MessageRole } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 
+const PROCESSING_TIMEOUT_MS = 15 * 60 * 1000;
+
 @Injectable()
 export class ChatsService {
   constructor(private readonly prisma: PrismaService) {}
@@ -16,6 +18,20 @@ export class ChatsService {
     return chat;
   }
 
+  private failStaleDocuments(userId: string) {
+    return this.prisma.document.updateMany({
+      where: {
+        userId,
+        status: DocumentStatus.PROCESSING,
+        createdAt: { lt: new Date(Date.now() - PROCESSING_TIMEOUT_MS) },
+      },
+      data: {
+        status: DocumentStatus.FAILED,
+        failureReason: 'Processing took too long and was interrupted. Please upload the file again.',
+      },
+    });
+  }
+
   async create(userId: string, filename: string) {
     const document = await this.prisma.document.create({
       data: { userId, filename },
@@ -27,15 +43,19 @@ export class ChatsService {
     return chat;
   }
 
-  list(userId: string) {
+  async list(userId: string) {
+    await this.failStaleDocuments(userId);
     return this.prisma.chat.findMany({
       where: { userId },
       orderBy: { updatedAt: 'desc' },
-      include: { document: { select: { filename: true, status: true } } },
+      include: {
+        document: { select: { filename: true, status: true, failureReason: true } },
+      },
     });
   }
 
-  get(userId: string, chatId: string) {
+  async get(userId: string, chatId: string) {
+    await this.failStaleDocuments(userId);
     return this.findOwnedChat(userId, chatId);
   }
 
@@ -50,11 +70,16 @@ export class ChatsService {
     userId: string,
     chatId: string,
     status: DocumentStatus,
+    failureReason?: string,
   ) {
     const chat = await this.findOwnedChat(userId, chatId);
     return this.prisma.document.update({
       where: { id: chat.documentId },
-      data: { status },
+      data: {
+        status,
+        failureReason:
+          status === DocumentStatus.FAILED ? (failureReason ?? null) : null,
+      },
     });
   }
 
