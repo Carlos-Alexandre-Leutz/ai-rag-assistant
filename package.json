@@ -1,7 +1,7 @@
 {
   "name": "saas-business-manager-2026",
   "private": true,
-  "packageManager": "pnpm@9.0.0",
+  "packageManager": "pnpm@9.15.4",
   "scripts": {
     "dev": "turbo run dev",
     "build": "turbo run build",
@@ -10,9 +10,5 @@
   },
   "devDependencies": {
     "turbo": "latest"
-  },
-  "dependencies": {
-    "@nestjs-modules/mailer": "^2.3.7",
-    "nodemailer": "^9.0.3"
   }
 }

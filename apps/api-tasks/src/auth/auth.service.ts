@@ -9,12 +9,14 @@ import { PrismaService } from '../prisma/prisma.service';
 import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
 import { MailService } from '../mail/mail.service';
+import { JwtService } from '@nestjs/jwt';
 
 @Injectable()
 export class AuthService {
   constructor(
     private prisma: PrismaService,
     private mailService: MailService,
+    private jwtService: JwtService,
   ) {}
 
   async register(data: any) {
@@ -52,8 +54,14 @@ export class AuthService {
       throw new UnauthorizedException('Credenciais inválidas');
     }
 
+    const payload = { sub: user.id, email: user.email };
+    const access_token = await this.jwtService.signAsync(payload);
+
     const { password, ...result } = user;
-    return result;
+    return {
+      ...result,
+      access_token,
+    };
   }
   async forgotPassword(email: string) {
     const user = await this.prisma.user.findUnique({

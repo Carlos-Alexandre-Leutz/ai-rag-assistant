@@ -1,6 +1,7 @@
 generator client {
-  provider      = "prisma-client-js"
-  binaryTargets = ["native", "debian-openssl-3.0.x", "linux-musl-openssl-3.0.x"]
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
+  binaryTargets   = ["native", "debian-openssl-3.0.x", "linux-musl-openssl-3.0.x"]
 }
 
 datasource db {
@@ -16,12 +17,64 @@ model Task {
 }
 
 model User {
-  id                   String   @id @default(uuid())
-  email                String   @unique
+  id                   String    @id @default(uuid())
+  email                String    @unique
   name                 String?
   password             String
-  createdAt            DateTime @default(now())
-  updatedAt            DateTime @updatedAt
-  passwordResetToken   String?  @unique
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+  passwordResetToken   String?   @unique
   passwordResetExpires DateTime?
+  documents            Document[]
+  chats                Chat[]
+}
+
+enum DocumentStatus {
+  PROCESSING
+  READY
+  FAILED
+}
+
+enum MessageRole {
+  USER
+  AI
+}
+
+model Document {
+  id        String         @id @default(uuid())
+  userId    String
+  user      User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  filename  String
+  status    DocumentStatus @default(PROCESSING)
+  createdAt DateTime       @default(now())
+  chat      Chat?
+
+  @@index([userId])
+}
+
+// One chat per document. The chunks live in the raw table "document_chunks"
+// (pgvector, not managed by Prisma) and point here through document_id.
+model Chat {
+  id         String    @id @default(uuid())
+  userId     String
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  documentId String    @unique
+  document   Document  @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  title      String
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  messages   Message[]
+
+  @@index([userId, updatedAt])
+}
+
+model Message {
+  id        String      @id @default(uuid())
+  chatId    String
+  chat      Chat        @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  role      MessageRole
+  content   String
+  createdAt DateTime    @default(now())
+
+  @@index([chatId, createdAt])
 }

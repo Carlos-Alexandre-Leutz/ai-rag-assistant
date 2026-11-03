@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import api from '@/lib/api';
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState('');
@@ -10,27 +11,23 @@ export default function ForgotPasswordPage() {
   const handleResetRequest = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    const response = await fetch(`${process.env.NEXT_PUBLIC_BFF_URL}/auth/forgot-password`, {
-      method: 'POST',
-      body: JSON.stringify({ email }),
-      headers: { 'Content-Type': 'application/json' }
-    });
-
-    if (response.ok) {
+    try {
+      await api.post('/auth/forgot-password', { email });
       setIsSent(true);
-    } else {
+    } catch (error) {
+      console.error(error);
       alert("Error: User not found or server error.");
     }
   };
 
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center p-24">
-      <div className="w-full max-w-md p-8 space-y-6 bg-black rounded shadow-md">
+    <main className="flex min-h-screen flex-col items-center justify-center p-4 sm:p-24 bg-zinc-950 text-white">
+      <div className="w-full max-w-md p-6 sm:p-8 space-y-6 bg-black rounded-lg border border-zinc-800 shadow-md">
         <h1 className="text-2xl font-bold text-center">Reset Password</h1>
 
         {!isSent ? (
           <form onSubmit={handleResetRequest} className="space-y-4">
-            <p className="text-sm text-gray-600">
+            <p className="text-sm text-gray-400">
               Enter your email address and we'll send you a link to reset your password.
             </p>
             <input
@@ -42,15 +39,15 @@ export default function ForgotPasswordPage() {
             />
             <button
               type="submit"
-              className="w-full p-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+              className="w-full p-2.5 bg-blue-600 text-white font-medium rounded hover:bg-blue-700 transition-colors"
             >
               Send Reset Link
             </button>
           </form>
         ) : (
           <div className="text-center space-y-4">
-            <div className="p-4 bg-green-100 text-green-700 rounded">
-              If an account exists for {email}, you will receive a password reset link shortly.
+            <div className="p-4 bg-green-950/50 border border-green-800 text-green-300 rounded-md text-sm">
+              If an account exists for <span className="font-semibold text-white">{email}</span>, you will receive a password reset link shortly.
             </div>
           </div>
         )}

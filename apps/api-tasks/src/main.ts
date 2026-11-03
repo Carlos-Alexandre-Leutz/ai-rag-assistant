@@ -6,8 +6,12 @@ async function bootstrap() {
 
   app.enableCors();
 
-  await app.listen(3002, '0.0.0.0');
+  const rawPort = process.env.PORT;
+  const parsedPort = rawPort ? parseInt(rawPort, 10) : NaN;
+  const port = !Number.isNaN(parsedPort) && parsedPort > 0 ? parsedPort : 3002;
 
-  console.log(`✅ Microserviço API-TASKS rodando em: http://localhost:3002`);
+  await app.listen(port, '0.0.0.0');
+
+  console.log(`✅ Microserviço API-TASKS rodando em: ${port}`);
 }
 bootstrap();
