@@ -163,6 +163,30 @@ export default function ChatPage() {
               >
                 <p className="text-sm whitespace-pre-wrap">{m.content}</p>
               </div>
+              {m.role === 'AI' && m.sources && m.sources.length > 0 && (
+                <details className="max-w-[85%] w-full text-xs text-[#e5bdbe]">
+                  <summary className="cursor-pointer select-none font-mono hover:text-[#dae2fd]">
+                    Sources ({m.sources.length})
+                  </summary>
+                  <ul className="mt-2 space-y-2">
+                    {m.sources.map((source, index) => (
+                      <li
+                        key={index}
+                        className="rounded-lg bg-[#131b2e] border border-[#5c3f40] px-3 py-2"
+                      >
+                        <div className="font-mono text-[#ffb3b6] mb-1">
+                          [{index + 1}] {source.filename}
+                          {source.page ? ` · page ${source.page}` : ''}
+                        </div>
+                        <p className="text-[#dae2fd]/80 whitespace-pre-wrap">
+                          {source.excerpt}
+                          {source.excerpt.length >= 300 ? '…' : ''}
+                        </p>
+                      </li>
+                    ))}
+                  </ul>
+                </details>
+              )}
               <span className="font-mono text-xs text-[#e5bdbe] opacity-0 group-hover:opacity-100 transition-opacity">
                 {formatTime(m.createdAt)}
               </span>

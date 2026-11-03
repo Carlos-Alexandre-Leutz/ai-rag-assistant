@@ -153,6 +153,7 @@ export class ChatsService {
     );
 
     let answer: string;
+    let sources: unknown[] = [];
     try {
       const form = new FormData() as any;
       form.append('user_id', userId);
@@ -171,6 +172,7 @@ export class ChatsService {
         this.http.post(`${this.aiUrl}/chat`, form, { headers: form.getHeaders() }),
       );
       answer = response.data.response;
+      sources = Array.isArray(response.data.sources) ? response.data.sources : [];
     } catch {
       throw new BadGatewayException('Erro ao comunicar com o serviço de IA.');
     }
@@ -179,7 +181,7 @@ export class ChatsService {
       'post',
       `/chats/${chatId}/messages`,
       authorization,
-      { role: 'AI', content: answer },
+      { role: 'AI', content: answer, sources },
     );
     return { userMessage, aiMessage };
   }

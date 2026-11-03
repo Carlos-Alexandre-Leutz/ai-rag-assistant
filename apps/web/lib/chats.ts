@@ -12,10 +12,18 @@ export type ChatSummary = {
   };
 };
 
+export type Source = {
+  filename: string;
+  page: number | null;
+  excerpt: string;
+  distance: number;
+};
+
 export type ChatMessage = {
   id: string;
   role: 'USER' | 'AI';
   content: string;
+  sources?: Source[] | null;
   createdAt: string;
 };
 
