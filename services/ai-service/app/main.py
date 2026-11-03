@@ -1,3 +1,4 @@
+import json
 import os
 import tempfile
 from io import BytesIO
@@ -18,6 +19,32 @@ app = FastAPI(
 
 client = genai.Client(api_key=GEMINI_API_KEY) if GEMINI_API_KEY else None
 
+MAX_HISTORY_MESSAGES = 10
+
+
+def format_history(raw_history: str | None) -> str:
+    """Turns the JSON list [{role, content}] sent by the BFF into prompt text."""
+    if not raw_history:
+        return ""
+    try:
+        items = json.loads(raw_history)
+    except ValueError:
+        return ""
+    if not isinstance(items, list):
+        return ""
+
+    lines = []
+    for item in items[-MAX_HISTORY_MESSAGES:]:
+        if not isinstance(item, dict) or not item.get("content"):
+            continue
+        speaker = "Assistant" if str(item.get("role", "")).lower() in ("ai", "assistant") else "User"
+        lines.append(f"{speaker}: {item['content']}")
+
+    if not lines:
+        return ""
+    return "\n=== PREVIOUS MESSAGES IN THIS CHAT ===\n" + "\n".join(lines) + "\n========================\n"
+
+
 @app.get("/health")
 async def health_check():
     return {"status": "online", "service": "ai-service"}
@@ -26,7 +53,9 @@ async def health_check():
 async def chat_endpoint(
     user_id: str = Form(...),
     message: str = Form(...),
-    file: UploadFile = File(None)
+    file: UploadFile = File(None),
+    document_id: str = Form(None),
+    history: str = Form(None),
 ):
     if not client:
         raise HTTPException(
@@ -42,16 +71,29 @@ async def chat_endpoint(
 
         with get_db_connection() as conn:
             with conn.cursor() as cur:
-                cur.execute(
-                    """
-                    SELECT content, filename, (embedding <=> %s::vector) AS distance
-                    FROM document_chunks
-                    WHERE user_id = %s
-                    ORDER BY distance ASC
-                    LIMIT %s;
-                    """,
-                    (query_vector, user_id, top_k),
-                )
+                if document_id:
+                    # Chat tied to a single document: search only its chunks.
+                    cur.execute(
+                        """
+                        SELECT content, filename, (embedding <=> %s::vector) AS distance
+                        FROM document_chunks
+                        WHERE document_id = %s AND user_id = %s
+                        ORDER BY distance ASC
+                        LIMIT %s;
+                        """,
+                        (query_vector, document_id, user_id, top_k),
+                    )
+                else:
+                    cur.execute(
+                        """
+                        SELECT content, filename, (embedding <=> %s::vector) AS distance
+                        FROM document_chunks
+                        WHERE user_id = %s
+                        ORDER BY distance ASC
+                        LIMIT %s;
+                        """,
+                        (query_vector, user_id, top_k),
+                    )
                 rows = cur.fetchall()
 
                 if rows:
@@ -60,6 +102,8 @@ async def chat_endpoint(
                         for row in rows
                     ]
                     retrieved_context = "\n\n".join(context_blocks)
+
+        history_block = format_history(history)
 
         augmented_prompt = f"""
 You are Vermilion, a specialized AI assistant.
@@ -75,7 +119,7 @@ Always reply in the exact same language that the user used to ask the QUESTION.
 === DOCUMENT CONTEXT ===
 {retrieved_context if retrieved_context else "No relevant document context found."}
 ========================
-
+{history_block}
 USER QUESTION:
 {message}
 """
@@ -127,9 +171,10 @@ async def create_single_embedding(payload: EmbeddingRequest):
 @app.post("/rag/process-pdf")
 async def process_pdf_for_rag(
     user_id: str = Form(...),
-    file: UploadFile = File(...)
+    file: UploadFile = File(...),
+    document_id: str = Form(None),
 ):
-    if not file.filename.endswith(".pdf"):
+    if not file.filename.lower().endswith(".pdf"):
         raise HTTPException(status_code=400, detail="The uploaded file must be a PDF..")
 
     try:
@@ -155,11 +200,11 @@ async def process_pdf_for_rag(
 
                     cur.execute(
                         """
-                        INSERT INTO document_chunks (user_id, filename, content, embedding)
-                        VALUES (%s, %s, %s, %s)
+                        INSERT INTO document_chunks (user_id, document_id, filename, content, embedding)
+                        VALUES (%s, %s, %s, %s, %s)
                         RETURNING id;
                         """,
-                        (user_id, file.filename, chunk, vector)
+                        (user_id, document_id, file.filename, chunk, vector)
                     )
                     chunk_id = cur.fetchone()[0]
 
@@ -175,10 +220,12 @@ async def process_pdf_for_rag(
             "message": "PDF successfully processed and saved!",
             "filename": file.filename,
             "user_id": user_id,
+            "document_id": document_id,
             "total_chunks": len(saved_chunks),
-            "chunks": saved_chunks
         }
 
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"RAG pipeline error: {str(e)}")
 

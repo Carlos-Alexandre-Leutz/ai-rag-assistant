@@ -17,6 +17,7 @@ async function bootstrap() {
 
   await app.register(multipart as any, {
     attachFieldsToBody: 'keyValues',
+    limits: { fileSize: 20 * 1024 * 1024 },
   });
   const allowedOrigins = process.env.ALLOWED_ORIGINS
     ? process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim())

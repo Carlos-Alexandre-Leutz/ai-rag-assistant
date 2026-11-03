@@ -3,6 +3,7 @@ import { HttpModule } from '@nestjs/axios';
 import { JwtModule } from '@nestjs/jwt';
 import { AuthController } from './auth.controller';
 import { AuthGuard } from './auth.guard';
+import { JwtAuthGuard } from './jwt-auth.guard';
 
 @Module({
   imports: [
@@ -14,7 +15,7 @@ import { AuthGuard } from './auth.guard';
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthGuard],
-  exports: [AuthGuard, JwtModule],
+  providers: [AuthGuard, JwtAuthGuard],
+  exports: [AuthGuard, JwtAuthGuard, JwtModule],
 })
 export class AuthModule {}

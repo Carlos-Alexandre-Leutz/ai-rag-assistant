@@ -1,8 +1,12 @@
 from fastapi import HTTPException
 from google import genai
+from google.genai import types
 from app.config import GEMINI_API_KEY
 
 client = genai.Client(api_key=GEMINI_API_KEY) if GEMINI_API_KEY else None
+
+# Must match the vector(768) column of document_chunks.
+EMBEDDING_DIMENSIONS = 768
 
 def generate_embedding(text: str) -> list[float]:
     if not client:
@@ -14,6 +18,7 @@ def generate_embedding(text: str) -> list[float]:
         response = client.models.embed_content(
             model="gemini-embedding-001",
             contents=text,
+            config=types.EmbedContentConfig(output_dimensionality=EMBEDDING_DIMENSIONS),
         )
 
         if hasattr(response, "embedding") and hasattr(response.embedding, "values"):
