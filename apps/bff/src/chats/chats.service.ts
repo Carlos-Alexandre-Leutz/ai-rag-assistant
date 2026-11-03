@@ -1,5 +1,6 @@
 import {
   BadGatewayException,
+  ConflictException,
   HttpException,
   Injectable,
 } from '@nestjs/common';
@@ -8,6 +9,7 @@ import { firstValueFrom } from 'rxjs';
 import FormData = require('form-data');
 
 const HISTORY_LIMIT = 10;
+const INGEST_TIMEOUT_MS = 10 * 60 * 1000;
 
 export type UploadedFile = {
   buffer: Buffer;
@@ -73,13 +75,25 @@ export class ChatsService {
     return this.tasks('get', `/chats/${chatId}/messages`, authorization);
   }
 
-  // Upload -> create document+chat -> embed the PDF -> mark the document ready.
-  // If embedding fails the chat is removed so no empty chat is left behind.
+  // Upload -> create document+chat (PROCESSING) -> answer right away. Embedding
+  // runs in the background and ends with the document READY or FAILED (with the
+  // reason), which the UI picks up by polling.
   async createFromFile(authorization: string, userId: string, file: UploadedFile) {
     const chat = await this.tasks('post', '/chats', authorization, {
       filename: file.filename,
     });
 
+    void this.ingest(authorization, userId, chat, file);
+    return chat;
+  }
+
+  private async ingest(
+    authorization: string,
+    userId: string,
+    chat: { id: string; documentId: string },
+    file: UploadedFile,
+  ) {
+    let body: { status: string; failureReason?: string };
     try {
       const form = new FormData() as any;
       form.append('user_id', userId);
@@ -93,20 +107,25 @@ export class ChatsService {
         this.http.post(`${this.aiUrl}/rag/process-pdf`, form, {
           headers: form.getHeaders(),
           maxBodyLength: Infinity,
+          timeout: INGEST_TIMEOUT_MS,
         }),
       );
+      body = { status: 'READY' };
     } catch (error: any) {
-      await this.tasks('delete', `/chats/${chat.id}`, authorization).catch(() => undefined);
       const detail = error.response?.data?.detail;
-      throw new BadGatewayException(
-        detail || 'Não foi possível processar o documento.',
-      );
+      body = {
+        status: 'FAILED',
+        failureReason:
+          typeof detail === 'string' ? detail : 'Could not process the document.',
+      };
     }
 
-    await this.tasks('patch', `/chats/${chat.id}/document`, authorization, {
-      status: 'READY',
-    });
-    return { ...chat, document: { ...chat.document, status: 'READY' } };
+    try {
+      await this.tasks('patch', `/chats/${chat.id}/document`, authorization, body);
+    } catch (error) {
+      // The stale-document sweep in api-tasks will eventually mark it FAILED.
+      console.error(`Could not update document status for chat ${chat.id}`, error);
+    }
   }
 
   async sendMessage(
@@ -116,6 +135,11 @@ export class ChatsService {
     content: string,
   ) {
     const chat = await this.get(authorization, chatId);
+    if (chat.document?.status !== 'READY') {
+      throw new ConflictException(
+        'This document is not ready yet. Wait until it finishes processing.',
+      );
+    }
     const previous: { role: string; content: string }[] = await this.messages(
       authorization,
       chatId,

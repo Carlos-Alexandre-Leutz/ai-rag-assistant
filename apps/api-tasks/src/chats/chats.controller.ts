@@ -47,11 +47,17 @@ export class ChatsController {
     @Req() req: any,
     @Param('id') id: string,
     @Body('status') status: DocumentStatus,
+    @Body('failureReason') failureReason?: string,
   ) {
     if (!Object.values(DocumentStatus).includes(status)) {
       throw new BadRequestException('status inválido.');
     }
-    return this.chatsService.setDocumentStatus(req.user.sub, id, status);
+    return this.chatsService.setDocumentStatus(
+      req.user.sub,
+      id,
+      status,
+      failureReason?.slice(0, 500),
+    );
   }
 
   @Get(':id/messages')

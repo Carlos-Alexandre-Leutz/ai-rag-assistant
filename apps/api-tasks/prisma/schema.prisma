@@ -46,6 +46,7 @@ model Document {
   user      User           @relation(fields: [userId], references: [id], onDelete: Cascade)
   filename  String
   status    DocumentStatus @default(PROCESSING)
+  failureReason String?
   createdAt DateTime       @default(now())
   chat      Chat?
 

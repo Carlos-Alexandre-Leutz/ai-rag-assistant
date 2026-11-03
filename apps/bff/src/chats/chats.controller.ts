@@ -34,8 +34,11 @@ export class ChatsController {
     }
 
     const filename = String(body.filename || 'document.pdf');
-    if (!filename.toLowerCase().endsWith('.pdf')) {
-      throw new BadRequestException('Apenas arquivos PDF são suportados.');
+    if (
+      !filename.toLowerCase().endsWith('.pdf') ||
+      !body.file.subarray(0, 1024).includes('%PDF-')
+    ) {
+      throw new BadRequestException('Only valid PDF files are supported.');
     }
 
     return this.chatsService.createFromFile(authorization, req.user.sub, {

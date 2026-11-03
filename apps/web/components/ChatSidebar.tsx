@@ -93,7 +93,7 @@ export default function ChatSidebar({
           className="w-full flex items-center justify-center gap-2 bg-[#e11d48] text-[#fffaf9] rounded-lg font-bold py-3 px-4 transition-all duration-200 hover:brightness-110 active:scale-95 disabled:opacity-60 disabled:cursor-wait"
         >
           <span className="material-symbols-outlined">{uploading ? 'hourglass_top' : 'add'}</span>
-          <span className="font-mono text-xs">{uploading ? 'Processing PDF...' : 'New Chat (PDF)'}</span>
+          <span className="font-mono text-xs">{uploading ? 'Uploading...' : 'New Chat (PDF)'}</span>
         </button>
 
         {error && <p className="text-xs text-[#ffb4ab]">{error}</p>}
@@ -118,6 +118,14 @@ export default function ChatSidebar({
               >
                 <span className="material-symbols-outlined text-[#ffb3b6] text-[18px]">description</span>
                 <span className="truncate text-sm text-[#dae2fd]">{chat.title}</span>
+                {chat.document?.status === 'PROCESSING' && (
+                  <span className="ml-auto shrink-0 font-mono text-[10px] text-[#e5bdbe] animate-pulse">
+                    Processing…
+                  </span>
+                )}
+                {chat.document?.status === 'FAILED' && (
+                  <span className="ml-auto shrink-0 font-mono text-[10px] text-[#ffb4ab]">Failed</span>
+                )}
               </Link>
               <button
                 onClick={() => handleDelete(chat.id, chat.title)}

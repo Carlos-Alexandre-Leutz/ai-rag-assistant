@@ -8,7 +8,7 @@ from google import genai
 from app.config import GEMINI_API_KEY
 from app.schemas.rag import EmbeddingRequest, EmbeddingResponse
 from app.services.text_splitter import split_text_into_chunks
-from app.services.embedding import generate_embedding
+from app.services.embedding import generate_embedding, generate_embeddings
 from app.database import get_db_connection
 
 
@@ -168,52 +168,57 @@ async def create_single_embedding(payload: EmbeddingRequest):
         raise HTTPException(status_code=500, detail=f"Error generating embedding: {str(e)}")
 
 
+# Plain "def" on purpose: ingestion is long and blocking, so FastAPI runs it in
+# a worker thread instead of freezing the event loop (and every /chat with it).
 @app.post("/rag/process-pdf")
-async def process_pdf_for_rag(
+def process_pdf_for_rag(
     user_id: str = Form(...),
     file: UploadFile = File(...),
     document_id: str = Form(None),
 ):
-    if not file.filename.lower().endswith(".pdf"):
-        raise HTTPException(status_code=400, detail="The uploaded file must be a PDF..")
+    contents = file.file.read()
+
+    # A real PDF starts with "%PDF-" near the beginning; the name is not enough.
+    if not file.filename.lower().endswith(".pdf") or b"%PDF-" not in contents[:1024]:
+        raise HTTPException(status_code=400, detail="The uploaded file is not a valid PDF.")
 
     try:
-        contents = await file.read()
         pdf_reader = PdfReader(BytesIO(contents))
-
         full_text = ""
         for page in pdf_reader.pages:
             extracted = page.extract_text()
             if extracted:
                 full_text += extracted + "\n"
+    except Exception:
+        raise HTTPException(
+            status_code=400,
+            detail="Could not read this PDF. It may be corrupted or password protected.",
+        )
 
-        if not full_text.strip():
-            raise HTTPException(status_code=400, detail="It was not possible to extract readable text from the PDF.")
+    if not full_text.strip():
+        raise HTTPException(
+            status_code=400,
+            detail="No readable text found. This looks like a scanned PDF (images only), which is not supported yet.",
+        )
 
-        raw_chunks = split_text_into_chunks(full_text)
+    try:
+        chunks = split_text_into_chunks(full_text)
 
-        saved_chunks = []
+        # Embed everything first, so a failure leaves nothing half-saved.
+        vectors = generate_embeddings(chunks)
+
         with get_db_connection() as conn:
             with conn.cursor() as cur:
-                for index, chunk in enumerate(raw_chunks):
-                    vector = generate_embedding(chunk)
-
-                    cur.execute(
-                        """
-                        INSERT INTO document_chunks (user_id, document_id, filename, content, embedding)
-                        VALUES (%s, %s, %s, %s, %s)
-                        RETURNING id;
-                        """,
+                cur.executemany(
+                    """
+                    INSERT INTO document_chunks (user_id, document_id, filename, content, embedding)
+                    VALUES (%s, %s, %s, %s, %s);
+                    """,
+                    [
                         (user_id, document_id, file.filename, chunk, vector)
-                    )
-                    chunk_id = cur.fetchone()[0]
-
-                    saved_chunks.append({
-                        "id": str(chunk_id),
-                        "chunk_index": index,
-                        "content": chunk
-                    })
-
+                        for chunk, vector in zip(chunks, vectors)
+                    ],
+                )
             conn.commit()
 
         return {
@@ -221,13 +226,14 @@ async def process_pdf_for_rag(
             "filename": file.filename,
             "user_id": user_id,
             "document_id": document_id,
-            "total_chunks": len(saved_chunks),
+            "total_chunks": len(chunks),
         }
 
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"RAG pipeline error: {str(e)}")
+
 
 # http://localhost:8000/ai/models
 @app.get("/ai/models")
