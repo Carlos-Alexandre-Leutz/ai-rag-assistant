@@ -69,11 +69,17 @@ export class ChatsController {
   addMessage(
     @Req() req: any,
     @Param('id') id: string,
-    @Body() body: { role: MessageRole; content: string },
+    @Body() body: { role: MessageRole; content: string; sources?: any[] },
   ) {
     if (!Object.values(MessageRole).includes(body?.role) || !body?.content?.trim()) {
       throw new BadRequestException('role e content são obrigatórios.');
     }
-    return this.chatsService.addMessage(req.user.sub, id, body.role, body.content);
+    return this.chatsService.addMessage(
+      req.user.sub,
+      id,
+      body.role,
+      body.content,
+      Array.isArray(body.sources) ? body.sources : undefined,
+    );
   }
 }

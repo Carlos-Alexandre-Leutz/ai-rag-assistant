@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { DocumentStatus, MessageRole } from '@prisma/client';
+import { DocumentStatus, MessageRole, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 
 const PROCESSING_TIMEOUT_MS = 15 * 60 * 1000;
@@ -96,10 +96,13 @@ export class ChatsService {
     chatId: string,
     role: MessageRole,
     content: string,
+    sources?: Prisma.InputJsonValue,
   ) {
     await this.findOwnedChat(userId, chatId);
     const [message] = await this.prisma.$transaction([
-      this.prisma.message.create({ data: { chatId, role, content } }),
+      this.prisma.message.create({
+        data: { chatId, role, content, ...(sources ? { sources } : {}) },
+      }),
       // Bumps updatedAt so the chat moves to the top of the sidebar.
       this.prisma.chat.update({ where: { id: chatId }, data: { updatedAt: new Date() } }),
     ]);

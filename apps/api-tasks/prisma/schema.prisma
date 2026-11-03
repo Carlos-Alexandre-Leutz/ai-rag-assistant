@@ -75,6 +75,8 @@ model Message {
   chat      Chat        @relation(fields: [chatId], references: [id], onDelete: Cascade)
   role      MessageRole
   content   String
+  // Passages the answer was based on: [{ filename, page, excerpt, distance }].
+  sources   Json?
   createdAt DateTime    @default(now())
 
   @@index([chatId, createdAt])
