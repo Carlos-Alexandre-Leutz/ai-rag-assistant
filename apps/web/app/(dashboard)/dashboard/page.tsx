@@ -4,9 +4,19 @@ import GuestChat from '@/components/GuestChat';
 import { useChats } from '@/components/ChatsProvider';
 
 export default function DashboardPage() {
-  const { auth, chats } = useChats();
+  const { auth, chats, chatsStatus } = useChats();
 
   if (auth !== 'user') return <GuestChat />;
+
+  if (chatsStatus !== 'ready') {
+    return (
+      <div className="flex-1 flex items-center justify-center p-6">
+        <p className={chatsStatus === 'error' ? 'text-[#ffb4ab]' : 'text-[#e5bdbe]/70 animate-pulse'}>
+          {chatsStatus === 'error' ? 'Could not load your chats.' : 'Loading...'}
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="flex-1 flex items-center justify-center p-6">

@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import api from '@/lib/api';
+import { listChats } from '@/lib/chats';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -20,7 +21,8 @@ export default function LoginPage() {
         if (response.data.name) {
           localStorage.setItem('user_name', response.data.name);
         }
-        router.push('/dashboard');
+        const chats = await listChats().catch(() => []);
+        router.push(chats.length ? `/dashboard/${chats[0].id}` : '/dashboard');
       } else {
         alert('Erro ao logar!');
       }

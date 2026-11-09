@@ -4,10 +4,12 @@ import {
   Controller,
   Delete,
   Get,
+  Header,
   Headers,
   Param,
   Post,
   Req,
+  StreamableFile,
   UseGuards,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -61,6 +63,39 @@ export class ChatsController {
   @Get(':id/messages')
   messages(@Headers('authorization') authorization: string, @Param('id') id: string) {
     return this.chatsService.messages(authorization, id);
+  }
+
+  @Post(':id/messages/stream')
+  @Header('Cache-Control', 'no-cache')
+  @Header('X-Accel-Buffering', 'no')
+  async stream(
+    @Req() req: any,
+    @Headers('authorization') authorization: string,
+    @Param('id') id: string,
+    @Body('content') content: string,
+  ) {
+    if (!content?.trim()) {
+      throw new BadRequestException('content é obrigatório.');
+    }
+    const output = await this.chatsService.streamMessage(
+      authorization,
+      req.user.sub,
+      id,
+      content.trim(),
+    );
+    return new StreamableFile(output, { type: 'application/x-ndjson' });
+  }
+
+  @Post(':id/answer/stream')
+  @Header('Cache-Control', 'no-cache')
+  @Header('X-Accel-Buffering', 'no')
+  async answer(
+    @Req() req: any,
+    @Headers('authorization') authorization: string,
+    @Param('id') id: string,
+  ) {
+    const output = await this.chatsService.streamAnswer(authorization, req.user.sub, id);
+    return new StreamableFile(output, { type: 'application/x-ndjson' });
   }
 
   @Post(':id/messages')

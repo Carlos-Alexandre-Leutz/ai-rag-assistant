@@ -15,7 +15,7 @@ export default function ChatSidebar({
 }) {
   const router = useRouter();
   const params = useParams<{ chatId?: string }>();
-  const { chats, userName, refreshChats, logout, handleExpiredSession } = useChats();
+  const { chats, chatsStatus, userName, refreshChats, logout, handleExpiredSession } = useChats();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState('');
@@ -72,7 +72,7 @@ export default function ChatSidebar({
         }`}
       >
         <div className="flex items-center justify-between mb-2">
-          <Link href="/dashboard" className="text-2xl font-bold text-[#ffb3b6]">
+          <Link href="/dashboard" onClick={onClose} className="text-2xl font-bold text-[#ffb3b6]">
             Vermilion
           </Link>
           <button className="lg:hidden text-[#e5bdbe] hover:text-[#dae2fd]" onClick={onClose}>
@@ -99,7 +99,21 @@ export default function ChatSidebar({
         {error && <p className="text-xs text-[#ffb4ab]">{error}</p>}
 
         <nav className="flex-1 overflow-y-auto -mx-1 px-1 space-y-1">
-          {chats.length === 0 && (
+          {chatsStatus === 'loading' && (
+            <p className="text-xs text-[#e5bdbe]/60 px-2 py-4 animate-pulse">Loading chats...</p>
+          )}
+          {chatsStatus === 'error' && (
+            <div className="px-2 py-4 space-y-2">
+              <p className="text-xs text-[#ffb4ab]">Could not load your chats.</p>
+              <button
+                onClick={refreshChats}
+                className="text-xs text-[#ffb3b6] underline underline-offset-2"
+              >
+                Try again
+              </button>
+            </div>
+          )}
+          {chatsStatus === 'ready' && chats.length === 0 && (
             <p className="text-xs text-[#e5bdbe]/60 px-2 py-4">
               No chats yet. Upload a PDF to start one.
             </p>
@@ -130,7 +144,7 @@ export default function ChatSidebar({
               <button
                 onClick={() => handleDelete(chat.id, chat.title)}
                 title="Delete chat"
-                className="opacity-0 group-hover:opacity-100 p-1.5 text-[#e5bdbe] hover:text-[#ffb4ab] transition"
+                className="opacity-0 group-hover:opacity-100 pointer-coarse:opacity-100 p-2 text-[#e5bdbe] hover:text-[#ffb4ab] transition"
               >
                 <span className="material-symbols-outlined text-[18px]">delete</span>
               </button>

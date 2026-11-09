@@ -65,6 +65,15 @@ export class ChatsController {
     return this.chatsService.listMessages(req.user.sub, id);
   }
 
+  @Delete(':id/messages/:messageId')
+  removeAiMessage(
+    @Req() req: any,
+    @Param('id') id: string,
+    @Param('messageId') messageId: string,
+  ) {
+    return this.chatsService.removeAiMessage(req.user.sub, id, messageId);
+  }
+
   @Post(':id/messages')
   addMessage(
     @Req() req: any,

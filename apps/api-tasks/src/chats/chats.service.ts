@@ -91,6 +91,15 @@ export class ChatsService {
     });
   }
 
+  async removeAiMessage(userId: string, chatId: string, messageId: string) {
+    await this.findOwnedChat(userId, chatId);
+    const { count } = await this.prisma.message.deleteMany({
+      where: { id: messageId, chatId, role: MessageRole.AI },
+    });
+    if (count === 0) throw new NotFoundException('Mensagem não encontrada.');
+    return { deleted: true };
+  }
+
   async addMessage(
     userId: string,
     chatId: string,

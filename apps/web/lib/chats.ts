@@ -1,4 +1,4 @@
-import api from '@/lib/api';
+import api, { API_URL } from '@/lib/api';
 
 export type ChatSummary = {
   id: string;
@@ -49,6 +49,69 @@ export const sendMessage = (id: string, content: string) =>
   api
     .post<{ userMessage: ChatMessage; aiMessage: ChatMessage }>(`/chats/${id}/messages`, { content })
     .then((r) => r.data);
+
+export type StreamHandlers = {
+  onSources: (sources: Source[]) => void;
+  onDelta: (text: string) => void;
+};
+
+const streamFailure = (status: number, message: string) => ({
+  response: { status, data: { message } },
+});
+
+const postStream = async (path: string, body: unknown, handlers: StreamHandlers) => {
+  const token = localStorage.getItem('token');
+  const response = await fetch(`${API_URL}${path}`, {
+    method: 'POST',
+    headers: {
+      ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}),
+      ...(token && token !== 'undefined' && token !== 'null'
+        ? { Authorization: `Bearer ${token}` }
+        : {}),
+    },
+    body: body !== undefined ? JSON.stringify(body) : undefined,
+  });
+
+  if (!response.ok || !response.body) {
+    const data = await response.json().catch(() => ({}));
+    throw { response: { status: response.status, data } };
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  let result: { userMessage: ChatMessage; aiMessage: ChatMessage } | null = null;
+
+  const handleLine = (line: string) => {
+    if (!line.trim()) return;
+    const event = JSON.parse(line);
+    if (event.type === 'sources') handlers.onSources(event.sources);
+    else if (event.type === 'delta') handlers.onDelta(event.text);
+    else if (event.type === 'error') throw streamFailure(502, event.detail);
+    else if (event.type === 'done') {
+      result = { userMessage: event.userMessage, aiMessage: event.aiMessage };
+    }
+  };
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split('\n');
+    buffer = lines.pop() ?? '';
+    lines.forEach(handleLine);
+  }
+  handleLine(buffer);
+
+  if (!result) throw streamFailure(502, 'The answer was interrupted.');
+  return result;
+};
+
+export const streamMessage = (id: string, content: string, handlers: StreamHandlers) =>
+  postStream(`/chats/${id}/messages/stream`, { content }, handlers);
+
+export const streamAnswer = (id: string, handlers: StreamHandlers) =>
+  postStream(`/chats/${id}/answer/stream`, undefined, handlers);
 
 export const errorMessage = (error: any, fallback: string) =>
   error?.response?.data?.message || error?.response?.data?.detail || fallback;
