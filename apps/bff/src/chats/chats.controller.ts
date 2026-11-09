@@ -86,6 +86,18 @@ export class ChatsController {
     return new StreamableFile(output, { type: 'application/x-ndjson' });
   }
 
+  @Post(':id/answer/stream')
+  @Header('Cache-Control', 'no-cache')
+  @Header('X-Accel-Buffering', 'no')
+  async answer(
+    @Req() req: any,
+    @Headers('authorization') authorization: string,
+    @Param('id') id: string,
+  ) {
+    const output = await this.chatsService.streamAnswer(authorization, req.user.sub, id);
+    return new StreamableFile(output, { type: 'application/x-ndjson' });
+  }
+
   @Post(':id/messages')
   send(
     @Req() req: any,

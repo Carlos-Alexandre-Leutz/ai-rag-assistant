@@ -11,6 +11,8 @@ import {
   getChat,
   getMessages,
   isUnauthorized,
+  StreamHandlers,
+  streamAnswer,
   streamMessage,
 } from '@/lib/chats';
 
@@ -78,16 +80,13 @@ export default function ChatPage() {
     if (chatAreaRef.current) chatAreaRef.current.scrollTop = chatAreaRef.current.scrollHeight;
   }, [messages, sending]);
 
-  const handleSend = async () => {
-    const content = text.trim();
-    if (!content || sending || documentStatus !== 'READY') return;
+  const runStream = async (
+    start: (handlers: StreamHandlers) => ReturnType<typeof streamMessage>,
+    options: { optimistic?: ChatMessage; dropLastAnswer?: boolean } = {},
+  ) => {
+    if (sending || documentStatus !== 'READY') return;
+    const { optimistic, dropLastAnswer } = options;
 
-    const optimistic: ChatMessage = {
-      id: `tmp-${Date.now()}`,
-      role: 'USER',
-      content,
-      createdAt: new Date().toISOString(),
-    };
     const placeholder: ChatMessage = {
       id: `tmp-ai-${Date.now()}`,
       role: 'AI',
@@ -97,20 +96,22 @@ export default function ChatPage() {
     const updatePlaceholder = (change: (m: ChatMessage) => ChatMessage) =>
       setMessages((prev) => prev.map((m) => (m.id === placeholder.id ? change(m) : m)));
 
-    setMessages((prev) => [...prev, optimistic, placeholder]);
-    setText('');
-    if (textareaRef.current) textareaRef.current.style.height = 'auto';
+    setMessages((prev) => {
+      const last = prev[prev.length - 1];
+      const base = dropLastAnswer && last?.role === 'AI' ? prev.slice(0, -1) : prev;
+      return [...base, ...(optimistic ? [optimistic] : []), placeholder];
+    });
     setSending(true);
     setError('');
 
     try {
-      const { userMessage, aiMessage } = await streamMessage(chatId, content, {
+      const { userMessage, aiMessage } = await start({
         onSources: (sources) => updatePlaceholder((m) => ({ ...m, sources })),
         onDelta: (piece) => updatePlaceholder((m) => ({ ...m, content: m.content + piece })),
       });
       setMessages((prev) => [
-        ...prev.filter((m) => m.id !== optimistic.id && m.id !== placeholder.id),
-        userMessage,
+        ...prev.filter((m) => m.id !== optimistic?.id && m.id !== placeholder.id),
+        ...(optimistic ? [userMessage] : []),
         aiMessage,
       ]);
       refreshChats();
@@ -123,6 +124,27 @@ export default function ChatPage() {
       setSending(false);
     }
   };
+
+  const handleSend = () => {
+    const content = text.trim();
+    if (!content || sending) return;
+
+    setText('');
+    if (textareaRef.current) textareaRef.current.style.height = 'auto';
+    runStream((handlers) => streamMessage(chatId, content, handlers), {
+      optimistic: {
+        id: `tmp-${Date.now()}`,
+        role: 'USER',
+        content,
+        createdAt: new Date().toISOString(),
+      },
+    });
+  };
+
+  const handleRetry = () => runStream((handlers) => streamAnswer(chatId, handlers));
+
+  const handleRegenerate = () =>
+    runStream((handlers) => streamAnswer(chatId, handlers), { dropLastAnswer: true });
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -213,11 +235,32 @@ export default function ChatPage() {
                   </ul>
                 </details>
               )}
-              <span className="font-mono text-xs text-[#e5bdbe] opacity-0 group-hover:opacity-100 transition-opacity">
-                {formatTime(m.createdAt)}
-              </span>
+              <div className="flex items-center gap-3">
+                <span className="font-mono text-xs text-[#e5bdbe] opacity-0 group-hover:opacity-100 transition-opacity">
+                  {formatTime(m.createdAt)}
+                </span>
+                {m.role === 'AI' && m.id === lastMessage?.id && !sending && (
+                  <button
+                    onClick={handleRegenerate}
+                    className="flex items-center gap-1 text-xs text-[#e5bdbe] hover:text-[#dae2fd] transition-colors"
+                  >
+                    <span className="material-symbols-outlined text-base">refresh</span>
+                    Regenerate
+                  </button>
+                )}
+              </div>
             </div>
           ))}
+
+          {lastMessage?.role === 'USER' && !sending && documentStatus === 'READY' && (
+            <button
+              onClick={handleRetry}
+              className="flex items-center gap-1 text-sm text-[#ffb3b6] hover:brightness-125 transition"
+            >
+              <span className="material-symbols-outlined text-base">refresh</span>
+              Try again
+            </button>
+          )}
 
           {waitingFirstToken && (
             <div className="bg-[#171f33] w-fit px-4 py-3 rounded-2xl rounded-tl-none border border-[#5c3f40] flex gap-1.5 items-center h-10">

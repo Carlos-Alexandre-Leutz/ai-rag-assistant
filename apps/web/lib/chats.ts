@@ -50,7 +50,7 @@ export const sendMessage = (id: string, content: string) =>
     .post<{ userMessage: ChatMessage; aiMessage: ChatMessage }>(`/chats/${id}/messages`, { content })
     .then((r) => r.data);
 
-type StreamHandlers = {
+export type StreamHandlers = {
   onSources: (sources: Source[]) => void;
   onDelta: (text: string) => void;
 };
@@ -59,21 +59,17 @@ const streamFailure = (status: number, message: string) => ({
   response: { status, data: { message } },
 });
 
-export const streamMessage = async (
-  id: string,
-  content: string,
-  handlers: StreamHandlers,
-) => {
+const postStream = async (path: string, body: unknown, handlers: StreamHandlers) => {
   const token = localStorage.getItem('token');
-  const response = await fetch(`${API_URL}/chats/${id}/messages/stream`, {
+  const response = await fetch(`${API_URL}${path}`, {
     method: 'POST',
     headers: {
-      'Content-Type': 'application/json',
+      ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}),
       ...(token && token !== 'undefined' && token !== 'null'
         ? { Authorization: `Bearer ${token}` }
         : {}),
     },
-    body: JSON.stringify({ content }),
+    body: body !== undefined ? JSON.stringify(body) : undefined,
   });
 
   if (!response.ok || !response.body) {
@@ -111,7 +107,13 @@ export const streamMessage = async (
   return result;
 };
 
-export const errorMessage =(error: any, fallback: string) =>
+export const streamMessage = (id: string, content: string, handlers: StreamHandlers) =>
+  postStream(`/chats/${id}/messages/stream`, { content }, handlers);
+
+export const streamAnswer = (id: string, handlers: StreamHandlers) =>
+  postStream(`/chats/${id}/answer/stream`, undefined, handlers);
+
+export const errorMessage = (error: any, fallback: string) =>
   error?.response?.data?.message || error?.response?.data?.detail || fallback;
 
 export const isUnauthorized = (error: any) => error?.response?.status === 401;

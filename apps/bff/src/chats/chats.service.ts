@@ -1,5 +1,6 @@
 import {
   BadGatewayException,
+  BadRequestException,
   ConflictException,
   HttpException,
   Injectable,
@@ -136,11 +137,32 @@ export class ChatsService {
         'This document is not ready yet. Wait until it finishes processing.',
       );
     }
-    const previous: { role: string; content: string }[] = await this.messages(
+    const previous: { id: string; role: string; content: string }[] =
+      await this.messages(authorization, chatId);
+    return { chat, previous };
+  }
+
+  async streamAnswer(authorization: string, userId: string, chatId: string) {
+    const { chat, previous } = await this.loadChatForAnswer(authorization, chatId);
+
+    const last = previous[previous.length - 1];
+    const replaced = last?.role === 'AI' ? last : undefined;
+    const history = replaced ? previous.slice(0, -1) : previous;
+    const question = history[history.length - 1];
+    if (!question || question.role !== 'USER') {
+      throw new BadRequestException('There is no question to answer.');
+    }
+
+    const output = new PassThrough();
+    void this.pipeAnswer(
+      output,
       authorization,
       chatId,
+      question,
+      this.buildAnswerForm(userId, chat.documentId, question.content, history.slice(0, -1)),
+      replaced?.id,
     );
-    return { chat, previous };
+    return output;
   }
 
   private buildAnswerForm(
@@ -195,6 +217,7 @@ export class ChatsService {
     chatId: string,
     userMessage: unknown,
     form: any,
+    replaceMessageId?: string,
   ) {
     const controller = new AbortController();
     let finished = false;
@@ -256,6 +279,13 @@ export class ChatsService {
         { role: 'AI', content: answer, sources },
       );
       finished = true;
+      if (replaceMessageId) {
+        await this.tasks(
+          'delete',
+          `/chats/${chatId}/messages/${replaceMessageId}`,
+          authorization,
+        ).catch(() => undefined);
+      }
       send({ type: 'done', userMessage, aiMessage });
     } catch (error: any) {
       finished = true;
