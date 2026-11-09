@@ -4,12 +4,14 @@ import {
   UnauthorizedException,
   NotFoundException,
   BadRequestException,
+  ServiceUnavailableException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
 import { MailService } from '../mail/mail.service';
 import { JwtService } from '@nestjs/jwt';
+import { GUEST_LIMITS } from './guest-limits';
 
 @Injectable()
 export class AuthService {
@@ -39,12 +41,38 @@ export class AuthService {
     const { password, ...result } = user;
     return result;
   }
+  async createGuest() {
+    const activeGuests = await this.prisma.user.count({
+      where: { isGuest: true, expiresAt: { gt: new Date() } },
+    });
+    if (activeGuests >= GUEST_LIMITS.maxActiveGuests) {
+      throw new ServiceUnavailableException(
+        'Too many guest sessions right now. Try again later or create an account.',
+      );
+    }
+
+    const expiresAt = new Date(Date.now() + GUEST_LIMITS.ttlMs);
+    const user = await this.prisma.user.create({
+      data: { name: 'Guest', isGuest: true, expiresAt },
+    });
+    const access_token = await this.jwtService.signAsync(
+      { sub: user.id, isGuest: true },
+      { expiresIn: Math.floor(GUEST_LIMITS.ttlMs / 1000) },
+    );
+    return { access_token, name: user.name, isGuest: true, expiresAt };
+  }
+
+  async deleteGuest(userId: string) {
+    await this.prisma.user.deleteMany({ where: { id: userId, isGuest: true } });
+    return { deleted: true };
+  }
+
   async login(data: any) {
     const user = await this.prisma.user.findUnique({
       where: { email: data.email },
     });
 
-    if (!user) {
+    if (!user || !user.password) {
       throw new UnauthorizedException('Credenciais inválidas');
     }
 
@@ -85,7 +113,7 @@ export class AuthService {
       },
     });
 
-    await this.mailService.sendPasswordReset(user.email, token);
+    await this.mailService.sendPasswordReset(email, token);
 
     return {
       message: 'E-mail de recuperação enviado com sucesso!',

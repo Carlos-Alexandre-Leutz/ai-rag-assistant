@@ -6,19 +6,38 @@ import {
   Get,
   Header,
   Headers,
+  HttpException,
+  HttpStatus,
   Param,
+  PayloadTooLargeException,
   Post,
   Req,
   StreamableFile,
   UseGuards,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { allowRequest } from '../common/rate-limit';
 import { ChatsService } from './chats.service';
+
+const GUEST_MAX_FILE_BYTES = 10 * 1024 * 1024;
+const GUEST_GENERATIONS_PER_MINUTE = 10;
 
 @Controller('chats')
 @UseGuards(JwtAuthGuard)
 export class ChatsController {
   constructor(private readonly chatsService: ChatsService) {}
+
+  private throttleGuest(req: any) {
+    if (
+      req.user.isGuest &&
+      !allowRequest(`generate:${req.user.sub}`, GUEST_GENERATIONS_PER_MINUTE, 60 * 1000)
+    ) {
+      throw new HttpException(
+        'Too many requests. Wait a moment before asking again.',
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
+    }
+  }
 
   @Get()
   list(@Headers('authorization') authorization: string) {
@@ -35,6 +54,12 @@ export class ChatsController {
       throw new BadRequestException('Envie um arquivo PDF no campo "file".');
     }
 
+    if (req.user.isGuest && body.file.length > GUEST_MAX_FILE_BYTES) {
+      throw new PayloadTooLargeException(
+        'Guest accounts can upload files up to 10 MB. Create an account for up to 20 MB.',
+      );
+    }
+
     const filename = String(body.filename || 'document.pdf');
     if (
       !filename.toLowerCase().endsWith('.pdf') ||
@@ -48,6 +73,11 @@ export class ChatsController {
       filename,
       mimetype: 'application/pdf',
     });
+  }
+
+  @Get('usage')
+  usage(@Headers('authorization') authorization: string) {
+    return this.chatsService.usage(authorization);
   }
 
   @Get(':id')
@@ -77,6 +107,7 @@ export class ChatsController {
     if (!content?.trim()) {
       throw new BadRequestException('content é obrigatório.');
     }
+    this.throttleGuest(req);
     const output = await this.chatsService.streamMessage(
       authorization,
       req.user.sub,
@@ -94,6 +125,7 @@ export class ChatsController {
     @Headers('authorization') authorization: string,
     @Param('id') id: string,
   ) {
+    this.throttleGuest(req);
     const output = await this.chatsService.streamAnswer(authorization, req.user.sub, id);
     return new StreamableFile(output, { type: 'application/x-ndjson' });
   }
@@ -108,6 +140,7 @@ export class ChatsController {
     if (!content?.trim()) {
       throw new BadRequestException('content é obrigatório.');
     }
+    this.throttleGuest(req);
     return this.chatsService.sendMessage(authorization, req.user.sub, id, content.trim());
   }
 }

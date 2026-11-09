@@ -1,5 +1,6 @@
-import { Controller, Post, Body } from '@nestjs/common';
+import { Controller, Post, Delete, Body, Req, UseGuards } from '@nestjs/common';
 import { AuthService } from './auth.service';
+import { JwtAuthGuard } from '../chats/jwt-auth.guard';
 
 @Controller('/auth')
 export class AuthController {
@@ -13,6 +14,17 @@ export class AuthController {
   @Post('login')
   async login(@Body() body: any) {
     return this.authService.login(body);
+  }
+
+  @Post('guest')
+  async guest() {
+    return this.authService.createGuest();
+  }
+
+  @Delete('guest')
+  @UseGuards(JwtAuthGuard)
+  async deleteGuest(@Req() req: any) {
+    return this.authService.deleteGuest(req.user.sub);
   }
 
   @Post('forgot-password')

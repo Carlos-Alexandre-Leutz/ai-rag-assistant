@@ -1,9 +1,10 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import api from '@/lib/api';
-import { listChats } from '@/lib/chats';
+import { GUEST_MAX_FILE_MB, listChats } from '@/lib/chats';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -18,6 +19,7 @@ export default function LoginPage() {
 
       if (response.data.access_token) {
         localStorage.setItem('token', response.data.access_token);
+        localStorage.removeItem('is_guest');
         if (response.data.name) {
           localStorage.setItem('user_name', response.data.name);
         }
@@ -63,6 +65,19 @@ export default function LoginPage() {
         <div className="flex flex-col sm:flex-row justify-between items-center gap-2 text-sm text-blue-500 mt-4">
           <a href="/register" className="hover:underline">Create Account</a>
           <a href="/forgot-password" className="hover:underline">Forgot Password</a>
+        </div>
+
+        <div className="border-t border-zinc-800 pt-4 space-y-2 text-center">
+          <Link
+            href="/dashboard"
+            className="block w-full p-2.5 border border-zinc-700 text-white font-medium rounded hover:bg-zinc-900 transition-colors"
+          >
+            Try without signing up
+          </Link>
+          <p className="text-xs text-zinc-400">
+            Guest limits: 1 PDF up to {GUEST_MAX_FILE_MB} MB, 20 questions, everything deleted
+            after 24 hours.
+          </p>
         </div>
       </div>
     </main>

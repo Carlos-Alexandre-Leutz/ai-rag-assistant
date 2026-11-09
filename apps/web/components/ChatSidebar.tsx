@@ -1,10 +1,12 @@
 'use client';
 
-import React, { useRef, useState } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useChats } from '@/components/ChatsProvider';
-import { createChatFromFile, deleteChat, errorMessage, isUnauthorized } from '@/lib/chats';
+import GuestBar from '@/components/GuestBar';
+import { useChatUpload } from '@/components/useChatUpload';
+import { deleteChat, errorMessage, isUnauthorized } from '@/lib/chats';
 
 export default function ChatSidebar({
   open,
@@ -16,34 +18,9 @@ export default function ChatSidebar({
   const router = useRouter();
   const params = useParams<{ chatId?: string }>();
   const { chats, chatsStatus, userName, refreshChats, logout, handleExpiredSession } = useChats();
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const [uploading, setUploading] = useState(false);
-  const [error, setError] = useState('');
-
-  const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    e.target.value = '';
-    if (!file) return;
-
-    if (!file.name.toLowerCase().endsWith('.pdf')) {
-      setError('Only PDF files are supported.');
-      return;
-    }
-
-    setError('');
-    setUploading(true);
-    try {
-      const chat = await createChatFromFile(file);
-      await refreshChats();
-      onClose();
-      router.push(`/dashboard/${chat.id}`);
-    } catch (err) {
-      if (isUnauthorized(err)) return handleExpiredSession();
-      setError(errorMessage(err, 'Could not process the document.'));
-    } finally {
-      setUploading(false);
-    }
-  };
+  const upload = useChatUpload(onClose);
+  const [deleteError, setDeleteError] = useState('');
+  const error = upload.error || deleteError;
 
   const handleDelete = async (id: string, title: string) => {
     if (!window.confirm(`Delete the chat "${title}" and its document?`)) return;
@@ -53,7 +30,7 @@ export default function ChatSidebar({
       if (params.chatId === id) router.push('/dashboard');
     } catch (err) {
       if (isUnauthorized(err)) return handleExpiredSession();
-      setError(errorMessage(err, 'Could not delete the chat.'));
+      setDeleteError(errorMessage(err, 'Could not delete the chat.'));
     }
   };
 
@@ -83,17 +60,21 @@ export default function ChatSidebar({
         <input
           type="file"
           accept="application/pdf,.pdf"
-          ref={fileInputRef}
-          onChange={handleFile}
+          ref={upload.inputRef}
+          onChange={upload.handleFile}
           className="hidden"
         />
         <button
-          onClick={() => fileInputRef.current?.click()}
-          disabled={uploading}
+          onClick={upload.openPicker}
+          disabled={upload.uploading}
           className="w-full flex items-center justify-center gap-2 bg-[#e11d48] text-[#fffaf9] rounded-lg font-bold py-3 px-4 transition-all duration-200 hover:brightness-110 active:scale-95 disabled:opacity-60 disabled:cursor-wait"
         >
-          <span className="material-symbols-outlined">{uploading ? 'hourglass_top' : 'add'}</span>
-          <span className="font-mono text-xs">{uploading ? 'Uploading...' : 'New Chat (PDF)'}</span>
+          <span className="material-symbols-outlined">
+            {upload.uploading ? 'hourglass_top' : 'add'}
+          </span>
+          <span className="font-mono text-xs">
+            {upload.uploading ? 'Uploading...' : 'New Chat (PDF)'}
+          </span>
         </button>
 
         {error && <p className="text-xs text-[#ffb4ab]">{error}</p>}
@@ -151,6 +132,8 @@ export default function ChatSidebar({
             </div>
           ))}
         </nav>
+
+        <GuestBar />
 
         <div className="border-t border-[#5c3f40] pt-3 flex items-center justify-between gap-2">
           <span className="truncate text-sm font-bold text-[#dae2fd]">{userName || 'My account'}</span>

@@ -2,7 +2,6 @@ import { Module } from '@nestjs/common';
 import { HttpModule } from '@nestjs/axios';
 import { JwtModule } from '@nestjs/jwt';
 import { AuthController } from './auth.controller';
-import { AuthGuard } from './auth.guard';
 import { JwtAuthGuard } from './jwt-auth.guard';
 
 @Module({
@@ -15,7 +14,7 @@ import { JwtAuthGuard } from './jwt-auth.guard';
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthGuard, JwtAuthGuard],
-  exports: [AuthGuard, JwtAuthGuard, JwtModule],
+  providers: [JwtAuthGuard],
+  exports: [JwtAuthGuard, JwtModule],
 })
 export class AuthModule {}

@@ -24,12 +24,17 @@ export class ChatsController {
     if (!filename?.trim()) {
       throw new BadRequestException('filename é obrigatório.');
     }
-    return this.chatsService.create(req.user.sub, filename.trim());
+    return this.chatsService.create(req.user.sub, filename.trim(), !!req.user.isGuest);
   }
 
   @Get()
   list(@Req() req: any) {
     return this.chatsService.list(req.user.sub);
+  }
+
+  @Get('usage')
+  usage(@Req() req: any) {
+    return this.chatsService.usage(req.user.sub);
   }
 
   @Get(':id')
@@ -89,6 +94,7 @@ export class ChatsController {
       body.role,
       body.content,
       Array.isArray(body.sources) ? body.sources : undefined,
+      !!req.user.isGuest,
     );
   }
 }

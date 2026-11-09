@@ -1,6 +1,4 @@
 import json
-import os
-import tempfile
 from io import BytesIO
 from fastapi import FastAPI, HTTPException, UploadFile, File, Form
 from fastapi.responses import StreamingResponse
@@ -13,7 +11,8 @@ from app.services.text_splitter import split_pages_into_chunks
 from app.services.embedding import generate_embedding, generate_embeddings
 from app.services.prompt import SYSTEM_INSTRUCTION, build_user_prompt
 from app.services.retry import with_retries
-from app.services.retrieval import retrieve_chunks, to_sources
+from app.services.question_scope import is_global_question
+from app.services.retrieval import load_document_chunks, retrieve_chunks, to_sources
 from app.database import get_db_connection
 
 
@@ -29,9 +28,15 @@ async def health_check():
     return {"status": "online", "service": "ai-service"}
 
 def prepare_prompt(message: str, user_id: str, document_id: str | None, history: str | None):
+    if document_id and is_global_question(client, message):
+        chunks, complete = load_document_chunks(user_id, document_id)
+        if chunks:
+            coverage = "complete" if complete else "sample"
+            return chunks, build_user_prompt(message, chunks, history, coverage), True
+
     query_vector = generate_embedding(message)
     chunks = retrieve_chunks(query_vector, user_id, document_id)
-    return chunks, build_user_prompt(message, chunks, history)
+    return chunks, build_user_prompt(message, chunks, history), False
 
 
 def ndjson(event: dict) -> str:
@@ -51,7 +56,9 @@ def chat_stream_endpoint(
         )
 
     try:
-        chunks, user_prompt = prepare_prompt(message, user_id, document_id, history)
+        chunks, user_prompt, whole_document = prepare_prompt(
+            message, user_id, document_id, history
+        )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"AI processing error: {str(e)}")
 
@@ -66,7 +73,13 @@ def chat_stream_endpoint(
         return stream, next(stream, None)
 
     def events():
-        yield ndjson({"type": "sources", "sources": to_sources(chunks)})
+        yield ndjson(
+            {
+                "type": "sources",
+                "sources": [] if whole_document else to_sources(chunks),
+                "scope": "document" if whole_document else "passages",
+            }
+        )
         try:
             stream, piece = with_retries(open_stream)
             while piece is not None:
@@ -81,10 +94,9 @@ def chat_stream_endpoint(
 
 
 @app.post("/chat")
-async def chat_endpoint(
+def chat_endpoint(
     user_id: str = Form(...),
     message: str = Form(...),
-    file: UploadFile = File(None),
     document_id: str = Form(None),
     history: str = Form(None),
 ):
@@ -93,28 +105,15 @@ async def chat_endpoint(
             status_code=500, detail="GEMINI_API_KEY was not configured in the container."
         )
 
-    temp_file_path = None
     try:
-        chunks, user_prompt = prepare_prompt(message, user_id, document_id, history)
-
-        contents_payload = []
-
-        if file and file.filename:
-            suffix = os.path.splitext(file.filename)[1]
-            with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as temp_file:
-                content = await file.read()
-                temp_file.write(content)
-                temp_file_path = temp_file.name
-
-            uploaded_gemini_file = client.files.upload(file=temp_file_path)
-            contents_payload.append(uploaded_gemini_file)
-
-        contents_payload.append(user_prompt)
+        chunks, user_prompt, whole_document = prepare_prompt(
+            message, user_id, document_id, history
+        )
 
         response = with_retries(
             lambda: client.models.generate_content(
                 model=GENERATION_MODEL,
-                contents=contents_payload,
+                contents=[user_prompt],
                 config=types.GenerateContentConfig(system_instruction=SYSTEM_INSTRUCTION),
             )
         )
@@ -122,19 +121,15 @@ async def chat_endpoint(
         return {
             "user_id": user_id,
             "response": response.text,
-            "filename": file.filename if (file and file.filename) else None,
             "context_used": bool(chunks),
-            "sources": to_sources(chunks),
+            "scope": "document" if whole_document else "passages",
+            "sources": [] if whole_document else to_sources(chunks),
         }
 
     except Exception as e:
         raise HTTPException(
             status_code=500, detail=f"AI processing error: {str(e)}"
         )
-
-    finally:
-        if temp_file_path and os.path.exists(temp_file_path):
-            os.remove(temp_file_path)
 
 
 @app.post("/rag/embedding", response_model=EmbeddingResponse)
@@ -188,12 +183,12 @@ def process_pdf_for_rag(
             with conn.cursor() as cur:
                 cur.executemany(
                     """
-                    INSERT INTO document_chunks (user_id, document_id, filename, page, content, embedding)
-                    VALUES (%s, %s, %s, %s, %s, %s);
+                    INSERT INTO document_chunks (user_id, document_id, filename, page, position, content, embedding)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s);
                     """,
                     [
-                        (user_id, document_id, file.filename, page, text, vector)
-                        for (page, text), vector in zip(chunks, vectors)
+                        (user_id, document_id, file.filename, page, position, text, vector)
+                        for position, ((page, text), vector) in enumerate(zip(chunks, vectors))
                     ],
                 )
             conn.commit()

@@ -34,6 +34,26 @@ export const getChat = (id: string) => api.get<ChatSummary>(`/chats/${id}`).then
 export const getMessages = (id: string) =>
   api.get<ChatMessage[]>(`/chats/${id}/messages`).then((r) => r.data);
 
+export const GUEST_MAX_FILE_MB = 10;
+
+export type Usage =
+  | { isGuest: false }
+  | {
+      isGuest: true;
+      expiresAt: string;
+      documents: { used: number; max: number };
+      questions: { used: number; max: number };
+    };
+
+export const getUsage = () => api.get<Usage>('/chats/usage').then((r) => r.data);
+
+export const createGuestSession = () =>
+  api
+    .post<{ access_token: string; name: string; expiresAt: string }>('/auth/guest')
+    .then((r) => r.data);
+
+export const endGuestSession = () => api.delete('/auth/guest');
+
 export const deleteChat = (id: string) => api.delete(`/chats/${id}`);
 
 export const createChatFromFile = (file: File) => {
@@ -69,7 +89,7 @@ const postStream = async (path: string, body: unknown, handlers: StreamHandlers)
         ? { Authorization: `Bearer ${token}` }
         : {}),
     },
-    body: body !== undefined ? JSON.stringify(body) : undefined,
+    ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
   });
 
   if (!response.ok || !response.body) {
