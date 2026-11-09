@@ -1,39 +1,42 @@
 from fastapi import HTTPException
 from google import genai
-from app.config import GEMINI_API_KEY
+from google.genai import types
+from app.services.retry import with_retries
+from app.config import EMBEDDING_DIMENSIONS, EMBEDDING_MODEL, GEMINI_API_KEY
 
 client = genai.Client(api_key=GEMINI_API_KEY) if GEMINI_API_KEY else None
 
-def generate_embedding(text: str) -> list[float]:
+# The Gemini API accepts up to 100 texts per embed_content call.
+BATCH_SIZE = 100
+
+def _embed_batch(texts: list[str]) -> list[list[float]]:
+    response = with_retries(
+        lambda: client.models.embed_content(
+            model=EMBEDDING_MODEL,
+            contents=texts,
+            config=types.EmbedContentConfig(output_dimensionality=EMBEDDING_DIMENSIONS),
+        )
+    )
+    return [item.values for item in response.embeddings]
+
+
+def generate_embeddings(texts: list[str]) -> list[list[float]]:
+    """Embeds many texts using as few API calls as possible, keeping order."""
     if not client:
         raise HTTPException(
             status_code=500, detail="GEMINI_API_KEY was not configured."
         )
 
+    vectors: list[list[float]] = []
     try:
-        response = client.models.embed_content(
-            model="gemini-embedding-001",
-            contents=text,
-        )
-
-        if hasattr(response, "embedding") and hasattr(response.embedding, "values"):
-            return response.embedding.values
-
-        if hasattr(response, "embeddings") and len(response.embeddings) > 0:
-            return response.embeddings[0].values
-
-        raise Exception(f"Unexpected response structure: {response}")
-
+        for start in range(0, len(texts), BATCH_SIZE):
+            vectors.extend(_embed_batch(texts[start:start + BATCH_SIZE]))
     except Exception as e:
-        try:
-            response = client.models.embed_content(
-                model="text-embedding-004",
-                contents=text,
-            )
-            return response.embedding.values
-        except Exception:
-            pass
-
         raise HTTPException(
             status_code=500, detail=f"Error generating embedding: {str(e)}"
         )
+    return vectors
+
+
+def generate_embedding(text: str) -> list[float]:
+    return generate_embeddings([text])[0]

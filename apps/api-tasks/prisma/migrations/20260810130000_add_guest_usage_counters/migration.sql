@@ -1,0 +1,3 @@
+-- AlterTable
+ALTER TABLE "User" ADD COLUMN "documentsUsed" INTEGER NOT NULL DEFAULT 0,
+ADD COLUMN "questionsUsed" INTEGER NOT NULL DEFAULT 0;
