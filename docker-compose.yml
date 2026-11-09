@@ -17,7 +17,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    command: sh -c "npx prisma migrate deploy --schema apps/api-tasks/prisma/schema.prisma && pnpm --filter api-tasks start"
+    command: sh -c "pnpm --filter @saas/api-tasks exec prisma migrate deploy --schema=./prisma/schema.prisma && pnpm --filter api-tasks start"
     ports:
       - "3002:3002"
     depends_on:

@@ -12,11 +12,12 @@ async function bootstrap() {
   dotenv.config();
   const app = await NestFactory.create<NestFastifyApplication>(
     AppModule,
-    new FastifyAdapter()
+    new FastifyAdapter({ trustProxy: true })
   );
 
   await app.register(multipart as any, {
     attachFieldsToBody: 'keyValues',
+    limits: { fileSize: 20 * 1024 * 1024 },
   });
   const allowedOrigins = process.env.ALLOWED_ORIGINS
     ? process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim())

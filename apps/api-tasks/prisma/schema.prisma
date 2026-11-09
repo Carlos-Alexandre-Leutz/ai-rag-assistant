@@ -18,11 +18,72 @@ model Task {
 
 model User {
   id                   String    @id @default(uuid())
-  email                String    @unique
+  email                String?   @unique
   name                 String?
-  password             String
+  password             String?
+  isGuest              Boolean   @default(false)
+  expiresAt            DateTime?
+  documentsUsed        Int       @default(0)
+  questionsUsed        Int       @default(0)
   createdAt            DateTime  @default(now())
   updatedAt            DateTime  @updatedAt
   passwordResetToken   String?   @unique
   passwordResetExpires DateTime?
+  documents            Document[]
+  chats                Chat[]
+
+  @@index([expiresAt])
+}
+
+enum DocumentStatus {
+  PROCESSING
+  READY
+  FAILED
+}
+
+enum MessageRole {
+  USER
+  AI
+}
+
+model Document {
+  id        String         @id @default(uuid())
+  userId    String
+  user      User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  filename  String
+  status    DocumentStatus @default(PROCESSING)
+  failureReason String?
+  createdAt DateTime       @default(now())
+  chat      Chat?
+
+  @@index([userId])
+}
+
+// One chat per document. The chunks live in the raw table "document_chunks"
+// (pgvector, not managed by Prisma) and point here through document_id.
+model Chat {
+  id         String    @id @default(uuid())
+  userId     String
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  documentId String    @unique
+  document   Document  @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  title      String
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  messages   Message[]
+
+  @@index([userId, updatedAt])
+}
+
+model Message {
+  id        String      @id @default(uuid())
+  chatId    String
+  chat      Chat        @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  role      MessageRole
+  content   String
+  // Passages the answer was based on: [{ filename, page, excerpt, distance }].
+  sources   Json?
+  createdAt DateTime    @default(now())
+
+  @@index([chatId, createdAt])
 }

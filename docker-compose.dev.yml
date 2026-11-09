@@ -11,73 +11,68 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U alexandre -d saas_business_manager"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
 
   api-tasks:
     build:
       context: .
       dockerfile: Dockerfile.dev
-    command: sh -c "pnpm --filter api-tasks exec prisma generate --schema=prisma/schema.prisma && pnpm --filter api-tasks exec prisma db push && pnpm --filter api-tasks dev"
+    command: sh -c "pnpm --filter @saas/api-tasks exec prisma generate --schema=./prisma/schema.prisma && pnpm --filter @saas/api-tasks exec prisma migrate deploy --schema=./prisma/schema.prisma && pnpm --filter api-tasks dev"
+    ports:
+      - "3002:3002"
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      - DATABASE_URL=postgresql://alexandre:mysecretpassword@db:5432/saas_business_manager?schema=public
     volumes:
       - .:/app
       - /app/node_modules
       - /app/apps/api-tasks/node_modules
-    ports:
-      - "3002:3002"
-    depends_on:
-      - db
-    env_file:
-      - ./apps/api-tasks/.env
-    environment:
-      - WATCHPACK_POLLING=true
 
   bff:
     build:
       context: .
       dockerfile: Dockerfile.dev
     command: pnpm --filter bff dev
-    volumes:
-      - .:/app
-      - /app/node_modules
-      - /app/apps/bff/node_modules
-      - /app/node_modules/.pnpm
-      - /app/.pnpm-store
     ports:
       - "3001:3001"
     depends_on:
       - api-tasks
-    env_file:
-      - ./apps/bff/.env
+      - ai-service
     environment:
-      - WATCHPACK_POLLING=true
-      - CHOKIDAR_USEPOLLING=true
-      - LEGACY_WATCHER=true
+      - TASKS_API_URL=http://api-tasks:3002
+      - AI_SERVICE_URL=http://ai-service:8000
+      - ALLOWED_ORIGINS=http://localhost:3000
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - /app/apps/bff/node_modules
 
   frontend:
     build:
       context: .
       dockerfile: Dockerfile.dev
     command: pnpm --filter web dev
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_BFF_URL=http://localhost:3001
     volumes:
       - .:/app
       - /app/node_modules
       - /app/apps/web/node_modules
       - /app/apps/web/.next
-      - /app/apps/web/.turbo
-    ports:
-      - "3000:3000"
-    env_file:
-      - ./apps/web/.env
-    environment:
-      - WATCHPACK_POLLING=true
-      - CHOKIDAR_USEPOLLING=true
-      - NEXT_WEBPACK_USEPOLLING=true
-      - FAST_REFRESH=true
 
   ai-service:
     build:
       context: .
       dockerfile: Dockerfile.ai.dev
-    container_name: saas_ai_service_dev
+    container_name: saas_ai_service
     ports:
       - "8000:8000"
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
