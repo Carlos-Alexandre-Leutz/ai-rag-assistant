@@ -5,6 +5,7 @@ import {
   Injectable,
 } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
+import { PassThrough } from 'stream';
 import { firstValueFrom } from 'rxjs';
 import FormData = require('form-data');
 
@@ -128,12 +129,7 @@ export class ChatsService {
     }
   }
 
-  async sendMessage(
-    authorization: string,
-    userId: string,
-    chatId: string,
-    content: string,
-  ) {
+  private async loadChatForAnswer(authorization: string, chatId: string) {
     const chat = await this.get(authorization, chatId);
     if (chat.document?.status !== 'READY') {
       throw new ConflictException(
@@ -144,6 +140,140 @@ export class ChatsService {
       authorization,
       chatId,
     );
+    return { chat, previous };
+  }
+
+  private buildAnswerForm(
+    userId: string,
+    documentId: string,
+    content: string,
+    previous: { role: string; content: string }[],
+  ) {
+    const form = new FormData() as any;
+    form.append('user_id', userId);
+    form.append('document_id', documentId);
+    form.append('message', content);
+    form.append(
+      'history',
+      JSON.stringify(
+        previous
+          .slice(-HISTORY_LIMIT)
+          .map((m) => ({ role: m.role, content: m.content })),
+      ),
+    );
+    return form;
+  }
+
+  async streamMessage(
+    authorization: string,
+    userId: string,
+    chatId: string,
+    content: string,
+  ) {
+    const { chat, previous } = await this.loadChatForAnswer(authorization, chatId);
+    const userMessage = await this.tasks(
+      'post',
+      `/chats/${chatId}/messages`,
+      authorization,
+      { role: 'USER', content },
+    );
+
+    const output = new PassThrough();
+    void this.pipeAnswer(
+      output,
+      authorization,
+      chatId,
+      userMessage,
+      this.buildAnswerForm(userId, chat.documentId, content, previous),
+    );
+    return output;
+  }
+
+  private async pipeAnswer(
+    output: PassThrough,
+    authorization: string,
+    chatId: string,
+    userMessage: unknown,
+    form: any,
+  ) {
+    const controller = new AbortController();
+    let finished = false;
+    output.on('close', () => {
+      if (!finished) controller.abort();
+    });
+
+    const send = (event: object) => {
+      if (!output.destroyed) output.write(`${JSON.stringify(event)}\n`);
+    };
+
+    let answer = '';
+    let sources: unknown[] = [];
+    let completed = false;
+
+    try {
+      const response = await firstValueFrom(
+        this.http.post(`${this.aiUrl}/chat/stream`, form, {
+          headers: form.getHeaders(),
+          responseType: 'stream',
+          signal: controller.signal,
+        }),
+      );
+      response.data.setEncoding('utf8');
+
+      let buffer = '';
+      const handleLine = (line: string) => {
+        if (!line.trim()) return;
+        const event = JSON.parse(line);
+        if (event.type === 'sources') {
+          sources = Array.isArray(event.sources) ? event.sources : [];
+          send(event);
+        } else if (event.type === 'delta') {
+          answer += event.text;
+          send(event);
+        } else if (event.type === 'error') {
+          throw new Error(event.detail);
+        } else if (event.type === 'done') {
+          completed = true;
+        }
+      };
+
+      for await (const piece of response.data) {
+        buffer += piece;
+        const lines = buffer.split('\n');
+        buffer = lines.pop() ?? '';
+        lines.forEach(handleLine);
+      }
+      handleLine(buffer);
+
+      if (!completed || !answer.trim()) {
+        throw new Error('The AI service ended the answer unexpectedly.');
+      }
+
+      const aiMessage = await this.tasks(
+        'post',
+        `/chats/${chatId}/messages`,
+        authorization,
+        { role: 'AI', content: answer, sources },
+      );
+      finished = true;
+      send({ type: 'done', userMessage, aiMessage });
+    } catch (error: any) {
+      finished = true;
+      if (!controller.signal.aborted) {
+        send({ type: 'error', detail: 'Erro ao comunicar com o serviço de IA.' });
+      }
+    } finally {
+      output.end();
+    }
+  }
+
+  async sendMessage(
+    authorization: string,
+    userId: string,
+    chatId: string,
+    content: string,
+  ) {
+    const { chat, previous } = await this.loadChatForAnswer(authorization, chatId);
 
     const userMessage = await this.tasks(
       'post',
@@ -155,18 +285,7 @@ export class ChatsService {
     let answer: string;
     let sources: unknown[] = [];
     try {
-      const form = new FormData() as any;
-      form.append('user_id', userId);
-      form.append('document_id', chat.documentId);
-      form.append('message', content);
-      form.append(
-        'history',
-        JSON.stringify(
-          previous
-            .slice(-HISTORY_LIMIT)
-            .map((m) => ({ role: m.role, content: m.content })),
-        ),
-      );
+      const form = this.buildAnswerForm(userId, chat.documentId, content, previous);
 
       const response = await firstValueFrom(
         this.http.post(`${this.aiUrl}/chat`, form, { headers: form.getHeaders() }),

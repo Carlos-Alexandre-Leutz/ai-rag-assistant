@@ -1,7 +1,9 @@
+import json
 import os
 import tempfile
 from io import BytesIO
 from fastapi import FastAPI, HTTPException, UploadFile, File, Form
+from fastapi.responses import StreamingResponse
 from pypdf import PdfReader
 from google import genai
 from google.genai import types
@@ -26,6 +28,58 @@ client = genai.Client(api_key=GEMINI_API_KEY) if GEMINI_API_KEY else None
 async def health_check():
     return {"status": "online", "service": "ai-service"}
 
+def prepare_prompt(message: str, user_id: str, document_id: str | None, history: str | None):
+    query_vector = generate_embedding(message)
+    chunks = retrieve_chunks(query_vector, user_id, document_id)
+    return chunks, build_user_prompt(message, chunks, history)
+
+
+def ndjson(event: dict) -> str:
+    return json.dumps(event, ensure_ascii=False) + "\n"
+
+
+@app.post("/chat/stream")
+def chat_stream_endpoint(
+    user_id: str = Form(...),
+    message: str = Form(...),
+    document_id: str = Form(None),
+    history: str = Form(None),
+):
+    if not client:
+        raise HTTPException(
+            status_code=500, detail="GEMINI_API_KEY was not configured in the container."
+        )
+
+    try:
+        chunks, user_prompt = prepare_prompt(message, user_id, document_id, history)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"AI processing error: {str(e)}")
+
+    def open_stream():
+        stream = iter(
+            client.models.generate_content_stream(
+                model=GENERATION_MODEL,
+                contents=[user_prompt],
+                config=types.GenerateContentConfig(system_instruction=SYSTEM_INSTRUCTION),
+            )
+        )
+        return stream, next(stream, None)
+
+    def events():
+        yield ndjson({"type": "sources", "sources": to_sources(chunks)})
+        try:
+            stream, piece = with_retries(open_stream)
+            while piece is not None:
+                if piece.text:
+                    yield ndjson({"type": "delta", "text": piece.text})
+                piece = next(stream, None)
+            yield ndjson({"type": "done"})
+        except Exception as e:
+            yield ndjson({"type": "error", "detail": f"AI processing error: {str(e)}"})
+
+    return StreamingResponse(events(), media_type="application/x-ndjson")
+
+
 @app.post("/chat")
 async def chat_endpoint(
     user_id: str = Form(...),
@@ -41,9 +95,7 @@ async def chat_endpoint(
 
     temp_file_path = None
     try:
-        query_vector = generate_embedding(message)
-        chunks = retrieve_chunks(query_vector, user_id, document_id)
-        user_prompt = build_user_prompt(message, chunks, history)
+        chunks, user_prompt = prepare_prompt(message, user_id, document_id, history)
 
         contents_payload = []
 

@@ -10,7 +10,7 @@ import {
   getChat,
   getMessages,
   isUnauthorized,
-  sendMessage,
+  streamMessage,
 } from '@/lib/chats';
 
 const formatTime = (iso: string) =>
@@ -87,15 +87,31 @@ export default function ChatPage() {
       content,
       createdAt: new Date().toISOString(),
     };
-    setMessages((prev) => [...prev, optimistic]);
+    const placeholder: ChatMessage = {
+      id: `tmp-ai-${Date.now()}`,
+      role: 'AI',
+      content: '',
+      createdAt: new Date().toISOString(),
+    };
+    const updatePlaceholder = (change: (m: ChatMessage) => ChatMessage) =>
+      setMessages((prev) => prev.map((m) => (m.id === placeholder.id ? change(m) : m)));
+
+    setMessages((prev) => [...prev, optimistic, placeholder]);
     setText('');
     if (textareaRef.current) textareaRef.current.style.height = 'auto';
     setSending(true);
     setError('');
 
     try {
-      const { userMessage, aiMessage } = await sendMessage(chatId, content);
-      setMessages((prev) => [...prev.filter((m) => m.id !== optimistic.id), userMessage, aiMessage]);
+      const { userMessage, aiMessage } = await streamMessage(chatId, content, {
+        onSources: (sources) => updatePlaceholder((m) => ({ ...m, sources })),
+        onDelta: (piece) => updatePlaceholder((m) => ({ ...m, content: m.content + piece })),
+      });
+      setMessages((prev) => [
+        ...prev.filter((m) => m.id !== optimistic.id && m.id !== placeholder.id),
+        userMessage,
+        aiMessage,
+      ]);
       refreshChats();
     } catch (err) {
       if (isUnauthorized(err)) return handleExpiredSession();
@@ -119,6 +135,9 @@ export default function ChatPage() {
     e.target.style.height = 'auto';
     e.target.style.height = `${e.target.scrollHeight}px`;
   };
+
+  const lastMessage = messages[messages.length - 1];
+  const waitingFirstToken = sending && lastMessage?.role === 'AI' && lastMessage.content === '';
 
   if (auth !== 'user') return null;
 
@@ -149,7 +168,9 @@ export default function ChatPage() {
             </p>
           )}
 
-          {messages.map((m) => (
+          {messages
+            .filter((m) => m.role !== 'AI' || m.content !== '')
+            .map((m) => (
             <div
               key={m.id}
               className={`flex flex-col gap-2 group ${m.role === 'USER' ? 'items-end' : 'items-start'}`}
@@ -193,7 +214,7 @@ export default function ChatPage() {
             </div>
           ))}
 
-          {sending && (
+          {waitingFirstToken && (
             <div className="bg-[#171f33] w-fit px-4 py-3 rounded-2xl rounded-tl-none border border-[#5c3f40] flex gap-1.5 items-center h-10">
               <span className="w-1.5 h-1.5 bg-[#5c3f40] rounded-full animate-bounce [animation-delay:-0.3s]" />
               <span className="w-1.5 h-1.5 bg-[#5c3f40] rounded-full animate-bounce [animation-delay:-0.15s]" />
