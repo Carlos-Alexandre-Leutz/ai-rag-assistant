@@ -30,4 +30,9 @@ def _float_env(name: str, default: float | None) -> float | None:
 # decides "not found" in those cases. Set RETRIEVAL_MAX_DISTANCE= (empty) to
 # disable, and re-run the evaluation after changing models or chunking.
 RETRIEVAL_TOP_K = int(os.getenv("RETRIEVAL_TOP_K", "5"))
+
+# Questions about the whole document (summary, rating, main themes) get the
+# document text instead of the top-k chunks. Longer documents are sampled
+# evenly so the prompt stays under this many characters (about 4 per token).
+GLOBAL_CONTEXT_MAX_CHARS = int(os.getenv("GLOBAL_CONTEXT_MAX_CHARS", "300000"))
 RETRIEVAL_MAX_DISTANCE = _float_env("RETRIEVAL_MAX_DISTANCE", 0.52)

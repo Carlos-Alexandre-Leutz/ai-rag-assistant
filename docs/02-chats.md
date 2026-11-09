@@ -9,7 +9,7 @@ This document explains how the logged-in area works: each user has several chats
 - Messages are stored, so a chat survives page reloads and can be reopened from the sidebar.
 - Deleting a chat deletes its document, its messages and its vector chunks.
 - Users only ever see their own chats.
-- Guests (no login) keep the old single, temporary chat with the 10-question limit. They cannot open `/dashboard/<chatId>` (it redirects to `/login`).
+- Visitors without an account get a temporary anonymous account and use the same screens with limits; see [03-guest-flow.md](03-guest-flow.md).
 
 ## 2. Architecture
 

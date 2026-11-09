@@ -12,7 +12,7 @@ async function bootstrap() {
   dotenv.config();
   const app = await NestFactory.create<NestFastifyApplication>(
     AppModule,
-    new FastifyAdapter()
+    new FastifyAdapter({ trustProxy: true })
   );
 
   await app.register(multipart as any, {

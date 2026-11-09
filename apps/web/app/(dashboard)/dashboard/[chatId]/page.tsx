@@ -36,10 +36,6 @@ export default function ChatPage() {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
-    if (auth === 'guest') router.replace('/login');
-  }, [auth, router]);
-
-  useEffect(() => {
     if (auth !== 'user') return;
     let cancelled = false;
     setLoadingChat(true);

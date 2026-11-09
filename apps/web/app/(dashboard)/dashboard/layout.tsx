@@ -1,17 +1,33 @@
 'use client';
 
 import React, { useState } from 'react';
+import Link from 'next/link';
 import { ChatsProvider, useChats } from '@/components/ChatsProvider';
 import ChatSidebar from '@/components/ChatSidebar';
 
 function DashboardShell({ children }: { children: React.ReactNode }) {
-  const { auth } = useChats();
+  const { auth, authError } = useChats();
   const [drawerOpen, setDrawerOpen] = useState(false);
 
   if (auth === 'loading') return null;
 
-  // Guests get the standalone single-chat experience (it has its own layout).
-  if (auth === 'guest') return <>{children}</>;
+  if (auth === 'unavailable') {
+    return (
+      <div className="font-sans h-dvh flex items-center justify-center p-6 bg-[#0b1326] text-[#dae2fd]">
+        <div className="max-w-md text-center space-y-4">
+          <p className="text-[#ffb4ab]">{authError}</p>
+          <div className="flex justify-center gap-4 text-sm">
+            <Link href="/login" className="text-[#ffb3b6] underline underline-offset-2">
+              Log in
+            </Link>
+            <Link href="/register" className="text-[#ffb3b6] underline underline-offset-2">
+              Create account
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="font-sans text-sm overflow-hidden h-dvh flex flex-col md:flex-row bg-[#0b1326] text-[#dae2fd]">

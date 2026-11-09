@@ -61,6 +61,10 @@ export class ChatsService {
     }
   }
 
+  usage(authorization: string) {
+    return this.tasks('get', '/chats/usage', authorization);
+  }
+
   list(authorization: string) {
     return this.tasks('get', '/chats', authorization);
   }

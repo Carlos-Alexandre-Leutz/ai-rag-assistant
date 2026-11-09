@@ -1,5 +1,11 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { DocumentStatus, MessageRole, Prisma } from '@prisma/client';
+import { GUEST_LIMITS } from '../auth/guest-limits';
 import { PrismaService } from '../prisma/prisma.service';
 
 const PROCESSING_TIMEOUT_MS = 15 * 60 * 1000;
@@ -32,7 +38,19 @@ export class ChatsService {
     });
   }
 
-  async create(userId: string, filename: string) {
+  async create(userId: string, filename: string, isGuest = false) {
+    if (isGuest) {
+      const { count } = await this.prisma.user.updateMany({
+        where: { id: userId, isGuest: true, documentsUsed: { lt: GUEST_LIMITS.maxDocuments } },
+        data: { documentsUsed: { increment: 1 } },
+      });
+      if (count === 0) {
+        throw new ForbiddenException(
+          `Guest accounts can upload ${GUEST_LIMITS.maxDocuments} document. Create an account to add more.`,
+        );
+      }
+    }
+
     const document = await this.prisma.document.create({
       data: { userId, filename },
     });
@@ -41,6 +59,21 @@ export class ChatsService {
       include: { document: true },
     });
     return chat;
+  }
+
+  async usage(userId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { isGuest: true, expiresAt: true, documentsUsed: true, questionsUsed: true },
+    });
+    if (!user) throw new UnauthorizedException('Session ended.');
+    if (!user.isGuest) return { isGuest: false };
+    return {
+      isGuest: true,
+      expiresAt: user.expiresAt,
+      documents: { used: user.documentsUsed, max: GUEST_LIMITS.maxDocuments },
+      questions: { used: user.questionsUsed, max: GUEST_LIMITS.maxQuestions },
+    };
   }
 
   async list(userId: string) {
@@ -73,6 +106,12 @@ export class ChatsService {
     failureReason?: string,
   ) {
     const chat = await this.findOwnedChat(userId, chatId);
+    if (status === DocumentStatus.FAILED) {
+      await this.prisma.user.updateMany({
+        where: { id: userId, isGuest: true, documentsUsed: { gt: 0 } },
+        data: { documentsUsed: { decrement: 1 } },
+      });
+    }
     return this.prisma.document.update({
       where: { id: chat.documentId },
       data: {
@@ -106,8 +145,20 @@ export class ChatsService {
     role: MessageRole,
     content: string,
     sources?: Prisma.InputJsonValue,
+    isGuest = false,
   ) {
     await this.findOwnedChat(userId, chatId);
+    if (isGuest && role === MessageRole.USER) {
+      const { count } = await this.prisma.user.updateMany({
+        where: { id: userId, isGuest: true, questionsUsed: { lt: GUEST_LIMITS.maxQuestions } },
+        data: { questionsUsed: { increment: 1 } },
+      });
+      if (count === 0) {
+        throw new ForbiddenException(
+          `Guest limit reached: ${GUEST_LIMITS.maxQuestions} questions. Create an account to keep chatting.`,
+        );
+      }
+    }
     const [message] = await this.prisma.$transaction([
       this.prisma.message.create({
         data: { chatId, role, content, ...(sources ? { sources } : {}) },
