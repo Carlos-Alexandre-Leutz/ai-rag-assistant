@@ -3,6 +3,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useChats } from '@/components/ChatsProvider';
+import MarkdownMessage from '@/components/MarkdownMessage';
 import {
   ChatMessage,
   ChatSummary,
@@ -182,7 +183,11 @@ export default function ChatPage() {
                     : 'bg-[#171f33] text-[#dae2fd] rounded-tl-none border border-[#5c3f40]'
                 }`}
               >
-                <p className="text-sm whitespace-pre-wrap">{m.content}</p>
+                {m.role === 'AI' ? (
+                  <MarkdownMessage content={m.content} />
+                ) : (
+                  <p className="text-sm whitespace-pre-wrap">{m.content}</p>
+                )}
               </div>
               {m.role === 'AI' && m.sources && m.sources.length > 0 && (
                 <details className="max-w-[85%] w-full text-xs text-[#e5bdbe]">
