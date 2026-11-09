@@ -14,7 +14,7 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
   if (auth === 'guest') return <>{children}</>;
 
   return (
-    <div className="font-sans text-sm overflow-hidden h-screen flex flex-col md:flex-row bg-[#0b1326] text-[#dae2fd]">
+    <div className="font-sans text-sm overflow-hidden h-dvh flex flex-col md:flex-row bg-[#0b1326] text-[#dae2fd]">
       <ChatSidebar open={drawerOpen} onClose={() => setDrawerOpen(false)} />
       <main className="flex-1 flex flex-col h-full relative overflow-hidden">
         <button

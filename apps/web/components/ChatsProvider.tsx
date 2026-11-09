@@ -5,11 +5,13 @@ import { useRouter } from 'next/navigation';
 import { ChatSummary, listChats, isUnauthorized } from '@/lib/chats';
 
 type AuthState = 'loading' | 'guest' | 'user';
+type ChatsStatus = 'loading' | 'ready' | 'error';
 
 type ChatsContextValue = {
   auth: AuthState;
   userName: string;
   chats: ChatSummary[];
+  chatsStatus: ChatsStatus;
   refreshChats: () => Promise<void>;
   logout: () => void;
   // Clears the session and sends the user to /login when a request got a 401.
@@ -36,6 +38,7 @@ export function ChatsProvider({ children }: { children: React.ReactNode }) {
   const [auth, setAuth] = useState<AuthState>('loading');
   const [userName, setUserName] = useState('');
   const [chats, setChats] = useState<ChatSummary[]>([]);
+  const [chatsStatus, setChatsStatus] = useState<ChatsStatus>('loading');
 
   const clearSession = () => {
     localStorage.removeItem('token');
@@ -50,8 +53,10 @@ export function ChatsProvider({ children }: { children: React.ReactNode }) {
   const refreshChats = useCallback(async () => {
     try {
       setChats(await listChats());
+      setChatsStatus('ready');
     } catch (error) {
-      if (isUnauthorized(error)) handleExpiredSession();
+      if (isUnauthorized(error)) return handleExpiredSession();
+      setChatsStatus((status) => (status === 'ready' ? status : 'error'));
     }
   }, [handleExpiredSession]);
 
@@ -81,7 +86,15 @@ export function ChatsProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <ChatsContext.Provider
-      value={{ auth, userName, chats, refreshChats, logout, handleExpiredSession }}
+      value={{
+        auth,
+        userName,
+        chats,
+        chatsStatus,
+        refreshChats,
+        logout,
+        handleExpiredSession,
+      }}
     >
       {children}
     </ChatsContext.Provider>

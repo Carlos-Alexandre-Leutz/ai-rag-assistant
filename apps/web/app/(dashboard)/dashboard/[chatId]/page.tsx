@@ -30,6 +30,7 @@ export default function ChatPage() {
   const [loadingChat, setLoadingChat] = useState(true);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState('');
+  const [reloadKey, setReloadKey] = useState(0);
 
   const chatAreaRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -62,7 +63,7 @@ export default function ChatPage() {
     return () => {
       cancelled = true;
     };
-  }, [auth, chatId, router, handleExpiredSession]);
+  }, [auth, chatId, reloadKey, router, handleExpiredSession]);
 
   // Document still processing: poll until it is READY or FAILED.
   const documentStatus = chat?.document?.status;
@@ -185,6 +186,22 @@ export default function ChatPage() {
 
       <div ref={chatAreaRef} className="flex-1 overflow-y-auto p-4 pt-8 pb-40">
         <div className="max-w-[800px] mx-auto space-y-8">
+          {loadingChat && (
+            <p className="text-center text-[#e5bdbe]/70 animate-pulse">Loading messages...</p>
+          )}
+
+          {!loadingChat && !chat && error && (
+            <div className="text-center space-y-3">
+              <p className="text-[#ffb4ab]">{error}</p>
+              <button
+                onClick={() => setReloadKey((key) => key + 1)}
+                className="text-sm text-[#ffb3b6] underline underline-offset-2"
+              >
+                Try again
+              </button>
+            </div>
+          )}
+
           {!loadingChat && messages.length === 0 && !error && documentStatus === 'READY' && (
             <p className="text-center text-[#e5bdbe]/70">
               Ask anything about <b>{chat?.title}</b>.
@@ -236,7 +253,7 @@ export default function ChatPage() {
                 </details>
               )}
               <div className="flex items-center gap-3">
-                <span className="font-mono text-xs text-[#e5bdbe] opacity-0 group-hover:opacity-100 transition-opacity">
+                <span className="font-mono text-xs text-[#e5bdbe] opacity-0 group-hover:opacity-100 pointer-coarse:opacity-100 transition-opacity">
                   {formatTime(m.createdAt)}
                 </span>
                 {m.role === 'AI' && m.id === lastMessage?.id && !sending && (
@@ -270,11 +287,11 @@ export default function ChatPage() {
             </div>
           )}
 
-          {error && <p className="text-center text-[#ffb4ab] text-sm">{error}</p>}
+          {error && chat && <p className="text-center text-[#ffb4ab] text-sm">{error}</p>}
         </div>
       </div>
 
-      <div className="absolute bottom-0 left-0 w-full p-4 bg-gradient-to-t from-[#0b1326] via-[#0b1326] to-transparent pointer-events-none">
+      <div className="absolute bottom-0 left-0 w-full p-4 pb-[max(1rem,env(safe-area-inset-bottom))] bg-gradient-to-t from-[#0b1326] via-[#0b1326] to-transparent pointer-events-none">
         <div className="max-w-[800px] mx-auto pointer-events-auto bg-[#222a3d] border border-[#5c3f40] rounded-[24px] p-2 shadow-xl backdrop-blur-md">
           <div className="flex items-end gap-2 p-1">
             <textarea
@@ -282,7 +299,7 @@ export default function ChatPage() {
               value={text}
               onChange={handleInput}
               onKeyDown={handleKeyDown}
-              className="flex-1 bg-transparent border-none focus:outline-none focus:ring-0 text-[#dae2fd] placeholder-[#e5bdbe]/60 py-3 px-3 text-sm resize-none max-h-48"
+              className="flex-1 bg-transparent border-none focus:outline-none focus:ring-0 text-[#dae2fd] placeholder-[#e5bdbe]/60 py-3 px-3 text-base sm:text-sm resize-none max-h-48"
               placeholder={
                 documentStatus === 'READY'
                   ? 'Ask a question about this document...'
